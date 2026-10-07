@@ -99,11 +99,11 @@ export const getSettings = () => {
     return stored ? JSON.parse(stored) : {
       soundEnabled: true,
       animationSpeed: 'normal',
-      theme: 'dark'
+      theme: 'system'
     };
   } catch (error) {
     console.error('Error reading settings:', error);
-    return { soundEnabled: true, animationSpeed: 'normal', theme: 'dark' };
+    return { soundEnabled: true, animationSpeed: 'normal', theme: 'system' };
   }
 };
 
