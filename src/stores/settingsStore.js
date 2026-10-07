@@ -7,6 +7,13 @@ const applyTheme = (theme) => {
   const root = document.documentElement;
   if (theme === 'light' || theme === 'dark') root.setAttribute('data-theme', theme);
   else root.removeAttribute('data-theme');
+
+  // Browser chrome colour: follow a forced theme, otherwise the OS preference.
+  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+    const scheme = meta.media.includes('dark') ? 'dark' : 'light';
+    const effective = theme === 'light' || theme === 'dark' ? theme : scheme;
+    meta.content = effective === 'dark' ? '#0A1122' : '#F4F6FB';
+  });
 };
 
 const initial = (() => {
