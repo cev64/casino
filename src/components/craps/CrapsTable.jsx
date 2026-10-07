@@ -18,10 +18,11 @@ import { RollHistory } from './RollHistory';
 const SHAKE_MS = 260; // dice in hand
 const TOSS_MS = 1000; // across the felt toward the back wall
 const LAND_SOUND_MS = 380; // first bounce after the toss
-const SETTLE_MS = 1000; // landing + a held beat before bets resolve
+const LAND_TIMEOUT_MS = 1600; // fallback if the dice never report landing (they normally do in ~1s)
+const HOLD_MS = 900; // dice sit still so the roll registers before it is announced and settled
 const RESOLVE_MS = 1700; // payout chips / sweep stay visible
 const REDUCED = {
-  SHAKE_MS: 80, TOSS_MS: 160, LAND_SOUND_MS: 0, SETTLE_MS: 350, RESOLVE_MS: 1200,
+  SHAKE_MS: 80, TOSS_MS: 160, LAND_SOUND_MS: 0, LAND_TIMEOUT_MS: 0, HOLD_MS: 800, RESOLVE_MS: 1200,
 };
 
 const sleep = (ms) => new Promise((r) => { setTimeout(r, ms); });
@@ -88,6 +89,8 @@ export const CrapsTable = ({ active = true }) => {
 
   const rootRef = useRef(null);
   const dockRef = useRef(null);
+  const landWaiter = useRef(null);
+  const onDiceSettled = useCallback(() => { landWaiter.current?.(); }, []);
   const alive = useRef(true);
   const busyRef = useRef(false);
   const clearMarksTimer = useRef(0);
@@ -210,7 +213,7 @@ export const CrapsTable = ({ active = true }) => {
       notify(blocked, { tone: 'bad' });
       return;
     }
-    const t = prefersReduced() ? REDUCED : { SHAKE_MS, TOSS_MS, LAND_SOUND_MS, SETTLE_MS, RESOLVE_MS };
+    const t = prefersReduced() ? REDUCED : { SHAKE_MS, TOSS_MS, LAND_SOUND_MS, LAND_TIMEOUT_MS, HOLD_MS, RESOLVE_MS };
 
     busyRef.current = true;
     setBusy(true);
@@ -237,9 +240,13 @@ export const CrapsTable = ({ active = true }) => {
 
     // 2. land and hold: bets stay exactly as they were
     if (!alive.current) { commitRoll(result); return; }
+    const landed = new Promise((resolve) => { landWaiter.current = resolve; });
     setRolling(false);
     setTimeout(() => sounds.diceLand?.(), t.LAND_SOUND_MS);
-    await sleep(t.SETTLE_MS);
+    // wait for both dice to come to rest, then hold so the roll can be read
+    await Promise.race([landed, sleep(t.LAND_TIMEOUT_MS)]);
+    landWaiter.current = null;
+    await sleep(t.HOLD_MS);
     if (!alive.current) { commitRoll(result); return; }
 
     // 3. resolve: wallet, table state, payouts and sweeps
@@ -338,7 +345,7 @@ export const CrapsTable = ({ active = true }) => {
 
   /* ---------------- render ---------------- */
 
-  const stage = useMemo(() => ({ dice, rolling, summary }), [dice, rolling, summary]);
+  const stage = useMemo(() => ({ dice, rolling, summary, onDiceSettled }), [dice, rolling, summary, onDiceSettled]);
   const state = gameState;
 
   return (

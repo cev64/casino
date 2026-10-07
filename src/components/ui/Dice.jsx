@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import { useReducedMotion } from 'framer-motion';
 
 /*
@@ -270,14 +270,23 @@ export const Die = memo(({ value = 1, isRolling = false, settleDelay = 0, classN
   );
 });
 
-export const DicePair = memo(({ die1 = 1, die2 = 1, isRolling = false, showTotal = true, className = '' }) => {
+/** onSettled fires once both dice have finished landing after a roll (not under reduced motion). */
+export const DicePair = memo(({ die1 = 1, die2 = 1, isRolling = false, showTotal = true, className = '', onSettled }) => {
   const a = Number(die1) || 1;
   const b = Number(die2) || 1;
+  const landed = useRef(0);
+  const onSettledRef = useRef(onSettled);
+  onSettledRef.current = onSettled;
+  if (isRolling) landed.current = 0;
+  const onLand = useCallback(() => {
+    landed.current += 1;
+    if (landed.current === 2) onSettledRef.current?.();
+  }, []);
   return (
     <div className={`dice-pair ${className}`}>
       <div className="dice-row">
-        <Die value={a} isRolling={isRolling} settleDelay={0} />
-        <Die value={b} isRolling={isRolling} settleDelay={0.12} />
+        <Die value={a} isRolling={isRolling} settleDelay={0} onLand={onLand} />
+        <Die value={b} isRolling={isRolling} settleDelay={0.12} onLand={onLand} />
       </div>
       {showTotal && (
         <span
