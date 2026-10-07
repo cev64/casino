@@ -253,6 +253,19 @@ export const CrapsTable = ({ active = true }) => {
 
   /* ---------------- keyboard ---------------- */
 
+  // Toasts rise above the sticky dock while this table is on screen
+  const dockRef = useRef(null);
+  useEffect(() => {
+    const el = dockRef.current;
+    const root = document.documentElement;
+    if (!active || !el) return undefined;
+    const sync = () => root.style.setProperty('--toast-lift', `${el.offsetHeight + 8}px`);
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => { ro.disconnect(); root.style.removeProperty('--toast-lift'); };
+  }, [active]);
+
   const handlersRef = useRef({});
   handlersRef.current = { handleRoll, handleUndo, handleClear, handleRebet, setChip, balance };
 
@@ -337,7 +350,7 @@ export const CrapsTable = ({ active = true }) => {
         <p className="cr-hint-line">Tap a spot to bet. Press and hold, or right-click, to take a bet down.</p>
       )}
 
-      <div className="cr-dock-wrap">
+      <div className="cr-dock-wrap" ref={dockRef}>
         <ControlDock
           chip={chip}
           onChip={setChip}

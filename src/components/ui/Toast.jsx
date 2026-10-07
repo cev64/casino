@@ -66,14 +66,15 @@ const ToastItem = ({ t }) => {
   );
 };
 
-/** Mount once near the app root. Sits above the bottom nav on phones. */
+/** Mount once near the app root. Sits above the bottom nav on phones, and above any
+ *  sticky control dock that sets --toast-lift on <html>. */
 export const ToastHost = () => {
   const toasts = useToastStore((s) => s.toasts);
   return (
     <div
       aria-live="polite"
       className="fixed inset-x-0 z-[60] flex flex-col items-center gap-2 pointer-events-none px-4
-        bottom-[calc(var(--nav-h)+28px+var(--safe-bottom))] nav:bottom-6"
+        bottom-[calc(var(--nav-h)+28px+var(--safe-bottom)+var(--toast-lift,0px))] nav:bottom-[calc(24px+var(--toast-lift,0px))]"
     >
       {toasts.map((t) => <ToastItem key={t.id} t={t} />)}
     </div>

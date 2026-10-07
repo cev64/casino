@@ -109,7 +109,7 @@
 .cr-hit[data-pressing] .cr-pressbar { width: 80%; opacity: 1; transition: width 500ms linear, opacity .1s linear; }
 
 /* a bet covers the print under it, like chips on a real felt */
-.cr-art { transition: opacity .25s var(--ease); }
+.cr-art { transition: opacity .25s var(--ease), transform .3s var(--ease); }
 .cr-spot[data-has-bet] .cr-art { opacity: .38; }
 .cr-placebox[data-has-bet] .cr-art, .cr-lay[data-has-bet] .cr-art { opacity: 1; }
 .cr-field .cr-chips, .cr-pass .cr-chips, .cr-dp .cr-chips, .cr-come .cr-chips, .cr-big .cr-chips, .cr-anycraps .cr-chips, .cr-seven .cr-chips {
@@ -434,3 +434,32 @@
 /* don't come bar bets on a number sit in a short strip: stack and amount side by side */
 .cr-lay .cs { flex-direction: row; gap: 4px; align-items: center; }
 .cr-lay .cs-label { font-size: 11px; }
+
+/* Wide spots: chips sit at the trailing end so the printed name stays legible
+   (dealers place them there too); the print no longer dims under a bet. */
+.cr-pass[data-has-bet] .cr-art, .cr-dp[data-has-bet] .cr-art, .cr-field[data-has-bet] .cr-art,
+.cr-come[data-has-bet] .cr-art, .cr-big[data-has-bet] .cr-art, .cr-seven[data-has-bet] .cr-art,
+.cr-anycraps[data-has-bet] .cr-art { opacity: 1; }
+.cr-pass .cr-chips, .cr-dp .cr-chips, .cr-big .cr-chips,
+.cr-seven .cr-chips, .cr-anycraps .cr-chips {
+  justify-content: flex-end; padding: 0 10px 0 0;
+}
+@container crapsfelt (max-width: 539px) {
+  .cr-come .cr-chips { justify-content: flex-end; padding: 0 10px 0 0; }
+  /* Long names on narrow spots slide left to make room for the stack */
+  .cr-pass .cr-art, .cr-dp .cr-art { transition: opacity .25s var(--ease), padding .3s var(--ease); }
+  .cr-pass .cr-art, .cr-dp .cr-art { width: 100%; }
+  .cr-pass[data-has-bet] .cr-art { align-items: flex-start; padding-left: 14px; }
+  .cr-dp[data-has-bet] .cr-art { justify-content: flex-start; padding-left: 14px; }
+  .cr-dp[data-has-bet] .cr-bar-dice { display: none; }
+}
+.cr-field .cr-chips { justify-content: flex-end; align-items: flex-end; padding: 0 10px 6px 0; }
+/* Small boxes (odds, don't come bar): the stack covers the print, like a real felt */
+.cr-odds[data-has-bet] .cr-art, .cr-dcb[data-has-bet] .cr-art { opacity: .2; }
+@container crapsfelt (min-width: 860px) {
+  /* Narrow, tall Big 6/8 boxes: name on top, chips below it */
+  .cr-big .cr-chips { justify-content: center; align-items: flex-end; padding: 0 0 6px; }
+  .cr-big[data-has-bet] .cr-art { transform: translateY(-22px); }
+  /* The come box also holds the dice and result: chips sit under the word COME */
+  .cr-come .cr-chips { justify-content: flex-start; align-items: center; padding: 0 0 0 31.5%; }
+}

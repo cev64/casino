@@ -128,7 +128,8 @@ export const RULES = {
         kind: 'terms',
         items: [
           { term: 'Odds limits', text: 'Pass and Come odds up to 3x on 4 and 10, 4x on 5 and 9, 5x on 6 and 8. Lay odds up to 6x.' },
-          { term: 'Place and hardways', text: 'Off on the come out roll. They stay up after a win and lose on a 7.' },
+          { term: 'Place bets', text: 'Off on the come out roll. They stay up after a win and lose on a 7.' },
+          { term: 'Hardways', text: 'Off on the come out roll. They stay up after a win and lose on a 7 or when the number rolls the easy way.' },
           { term: 'Big 6 and Big 8', text: 'Pay 1 to 1 and lose on any 7.' },
           { term: 'Limits', text: 'Bets run from $5 to $500. Odds and one roll bets can start at $1.' },
           { term: 'Payouts', text: 'Winnings are paid in whole dollars, rounded down.' },
