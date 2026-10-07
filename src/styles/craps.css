@@ -1,1 +1,436 @@
-/* craps styles — owned by the craps workstream */
+/* ==========================================================================
+   Craps. Chrome (readout, history, dock) is Fluid Glass; the table is a printed felt.
+   Printed lines are thin cream ink at ~55%, never glowing. Owned by the craps workstream.
+   ========================================================================== */
+
+.cr-root {
+  --cr-ink: rgb(var(--felt-ink) / .92);
+  --cr-ink-2: rgb(var(--felt-ink) / .72);
+  --cr-line: rgb(var(--felt-ink) / .5);
+  --cr-line-strong: rgb(var(--felt-ink) / .78);
+  --cr-hover: rgb(255 255 255 / .07);
+  --cr-dock-gap: 10px;
+  display: flex; flex-direction: column; gap: 12px;
+  width: 100%;
+}
+
+/* ---------- Readout (glass) ---------- */
+
+.cr-readout {
+  display: grid; align-items: center;
+  grid-template-columns: auto auto 1fr;
+  gap: 10px 28px;
+  padding: 12px 20px;
+}
+.cr-stat { display: flex; flex-direction: column; min-width: 0; }
+.cr-stat .t-card-title { white-space: nowrap; }
+.cr-stat-limits { display: none; }
+.cr-history { grid-column: 1 / -1; min-width: 0; overflow: hidden; }
+.cr-history-empty { font-size: 14px; color: var(--ink-3); }
+.cr-history-list { display: flex; gap: 4px; list-style: none; margin: 0; padding: 0; }
+.cr-roll {
+  flex: none; width: 32px; padding: 4px 0 3px; border-radius: 10px;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  background: var(--fill);
+}
+.cr-roll-total { font-size: 15px; line-height: 18px; font-weight: 600; color: var(--ink); }
+.cr-roll-tag { font-size: 10px; line-height: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.cr-roll[data-event="sevenOut"],
+.cr-roll[data-event="pointMade"] { background: var(--fill-2); }
+.cr-roll[data-event="sevenOut"] .cr-roll-tag,
+.cr-roll[data-event="pointMade"] .cr-roll-tag { color: var(--ink); }
+@media (max-width: 599px) {
+  .cr-roll:nth-child(n+11) { display: none; }
+}
+@media (min-width: 760px) {
+  .cr-readout { grid-template-columns: auto auto auto 1fr; }
+  .cr-stat-limits { display: flex; }
+  .cr-history { grid-column: auto; justify-self: end; }
+}
+
+/* ---------- Felt + table ---------- */
+
+.cr-felt {
+  --felt-pad: 8px;
+  container: crapsfelt / inline-size;
+}
+@media (min-width: 600px) { .cr-felt { --felt-pad: 14px; } }
+
+.cr-table {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+}
+
+/* ---------- Spots ---------- */
+
+.cr-spot { position: relative; min-width: 0; min-height: 0; border-radius: 10px; }
+.ga-lay > .cr-spot, .ga-odds > .cr-spot { height: 100%; }
+.ga-lay, .ga-odds { display: block; min-width: 0; min-height: 0; }
+
+.cr-hit {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0; margin: 0; border: 0; border-radius: inherit;
+  background: transparent; color: var(--cr-ink); font: inherit;
+  cursor: pointer; overflow: hidden;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  touch-action: manipulation;
+  transition: background-color .22s var(--ease), transform .15s var(--ease), opacity .2s var(--ease);
+}
+.cr-hit:focus-visible {
+  outline: none; overflow: visible;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgb(0 0 0 / .5);
+  z-index: 3;
+}
+@media (hover: hover) {
+  .cr-spot:not([data-busy]) .cr-hit:hover { background: var(--cr-hover); }
+}
+.cr-spot:not([data-busy]) .cr-hit:active { transform: scale(.985); }
+.cr-spot[data-busy] .cr-hit { cursor: default; }
+.cr-spot[data-blocked]:not([data-has-bet]) .cr-hit { opacity: .5; }
+.cr-spot[data-result="win"] .cr-hit { background: rgb(var(--felt-ink) / .13); }
+.cr-spot[data-result="lose"] .cr-hit { background: rgb(0 0 0 / .2); }
+.cr-spot[data-result="push"] .cr-hit { background: rgb(var(--felt-ink) / .07); }
+
+.cr-art {
+  position: relative; z-index: 1; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; text-align: center; max-width: 100%;
+}
+
+/* press-and-hold progress: a thin line filling over 500ms */
+.cr-pressbar {
+  position: absolute; left: 10%; bottom: 3px; height: 3px; width: 0; border-radius: 2px;
+  background: rgb(var(--felt-ink) / .8); opacity: 0; pointer-events: none;
+}
+.cr-hit[data-pressing] .cr-pressbar { width: 80%; opacity: 1; transition: width 500ms linear, opacity .1s linear; }
+
+/* a bet covers the print under it, like chips on a real felt */
+.cr-art { transition: opacity .25s var(--ease); }
+.cr-spot[data-has-bet] .cr-art { opacity: .38; }
+.cr-placebox[data-has-bet] .cr-art, .cr-lay[data-has-bet] .cr-art { opacity: 1; }
+.cr-field .cr-chips, .cr-pass .cr-chips, .cr-dp .cr-chips, .cr-come .cr-chips, .cr-big .cr-chips, .cr-anycraps .cr-chips, .cr-seven .cr-chips {
+  justify-content: center;
+}
+
+/* chips */
+.cr-chips {
+  position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  display: flex; align-items: center; justify-content: center;
+}
+.cr-stack { display: flex; align-items: center; justify-content: center; }
+.cr-chips .cs { gap: 2px; }
+.cr-chips .cs-label { font-size: 11px; line-height: 13px; color: rgb(var(--felt-ink)); text-shadow: 0 1px 1px rgb(0 0 0 / .45); }
+
+.cr-payout {
+  position: absolute; z-index: 4; top: 4px; right: 4px; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.cr-payout-label {
+  font-size: 12px; line-height: 16px; font-weight: 600; padding: 0 7px; border-radius: 999px;
+  background: rgb(0 0 0 / .5); color: rgb(var(--felt-ink));
+}
+.cr-lock {
+  position: absolute; z-index: 3; top: 4px; right: 4px; width: 18px; height: 18px;
+  display: grid; place-items: center; border-radius: 50%; pointer-events: none;
+  background: rgb(0 0 0 / .38); color: rgb(var(--felt-ink));
+}
+.cr-off {
+  position: absolute; z-index: 3; top: -8px; left: 50%; transform: translateX(-50%); pointer-events: none;
+  font-size: 10px; line-height: 14px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  padding: 0 6px; border-radius: 999px; background: rgb(0 0 0 / .4); color: rgb(var(--felt-ink) / .9);
+}
+.cr-hint {
+  position: absolute; z-index: 3; bottom: 2px; left: 0; right: 0; text-align: center; pointer-events: none;
+  font-size: 10px; line-height: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+  color: rgb(var(--felt-ink) / .72);
+}
+
+/* ---------- Printing ---------- */
+
+.cr-print {
+  font-family: 'Barlow Condensed', 'Inter', sans-serif; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; line-height: 1;
+  color: var(--cr-ink);
+}
+.cr-tiny {
+  font-family: 'Inter', system-ui, sans-serif; font-size: 10px; line-height: 12px;
+  letter-spacing: .12em; color: var(--cr-ink-2);
+}
+.cr-pdice { display: block; height: 14px; width: auto; color: var(--cr-ink-2); flex: none; }
+
+.cr-box .cr-hit { border: 1.5px solid var(--cr-line); border-radius: 10px; }
+.cr-box { border-radius: 10px; }
+
+/* number boxes */
+.cr-num {
+  position: relative; min-width: 0;
+  display: grid; grid-template-rows: 40px minmax(0, 1fr);
+  border: 1.5px solid var(--cr-line); border-radius: 10px;
+  min-height: 126px;
+  transition: background-color .3s var(--ease);
+}
+.cr-num[data-point] { background: rgb(var(--felt-ink) / .1); border-color: var(--cr-line-strong); }
+.cr-lay, .cr-placebox { border-radius: 0; }
+.cr-lay { border-radius: 8px 8px 0 0; border-bottom: 1.5px solid var(--cr-line); }
+.cr-lay-empty { display: grid; place-items: center; }
+.cr-lay .cr-hit::after { content: ''; position: absolute; inset: -2px; }
+.cr-lay .cr-tiny, .cr-lay-empty .cr-tiny { opacity: .6; }
+.cr-lay .cr-chips { align-items: center; }
+.cr-placebox { border-radius: 0 0 8px 8px; }
+.cr-placebox .cr-art { justify-content: flex-start; padding-top: 5px; }
+.cr-placebox .cr-chips { align-items: flex-end; padding-bottom: 4px; }
+.cr-numeral {
+  font-family: 'Barlow Condensed', 'Inter', sans-serif; font-weight: 600;
+  font-size: 32px; line-height: 1; letter-spacing: .04em; color: var(--cr-ink);
+}
+.cr-numeral[data-word] { font-size: 24px; letter-spacing: .1em; text-transform: uppercase; }
+
+/* a come bet that travelled to this number sits at the right, its odds on top of it */
+.cr-comebox { position: absolute; z-index: 2; right: 0; bottom: 0; width: 56%; height: 58%; }
+.cr-comebox .cr-hit { border-radius: 8px; }
+.cr-comebox .cr-chips { align-items: flex-end; padding-bottom: 4px; }
+.cr-comebox .cr-lock { top: 2px; right: 2px; }
+.cr-comebox .cr-hint { bottom: auto; top: 2px; }
+.cr-comebox .cr-off { top: auto; bottom: -8px; left: 50%; }
+.cr-num:has(.cr-comebox) .cr-placebox .cr-chips { justify-content: flex-start; padding-left: 8px; }
+
+.cr-puck { position: absolute; z-index: 6; pointer-events: none; line-height: 0; }
+.cr-puck-num { top: 3px; right: 3px; }
+.cr-puck-bar { top: 5px; left: 6px; }
+
+/* named boxes */
+.cr-come-text { font-size: 40px; letter-spacing: .34em; text-indent: .34em; font-weight: 600; }
+.cr-bar-text { font-size: 15px; letter-spacing: .12em; line-height: 1.1; }
+.cr-bar-text.cr-inline { font-size: 15px; }
+.cr-dcb .cr-art { gap: 4px; }
+.cr-dcb .cr-bar-dice { display: none; }
+.cr-dp .cr-art { flex-direction: row; gap: 12px; }
+.cr-pass .cr-hit { border-width: 3px; border-radius: 12px; }
+.cr-pass-text { font-size: 26px; letter-spacing: .3em; text-indent: .3em; }
+.cr-odds .cr-hit { border-style: dashed; }
+.cr-odds-text { font-size: 18px; letter-spacing: .24em; text-indent: .24em; line-height: 1.05; }
+.cr-odds .cr-art { gap: 3px; }
+.cr-odds[data-has-bet] .cr-odds-max { display: none; }
+.cr-big-text { font-size: 28px; letter-spacing: .06em; display: inline-flex; align-items: baseline; gap: 6px; }
+.cr-big-text small { font-size: 15px; letter-spacing: .14em; }
+
+/* field */
+.cr-field .cr-art { gap: 4px; }
+.cr-field-row { display: flex; align-items: center; justify-content: center; gap: clamp(6px, 2.4cqi, 20px); }
+.cr-fnum { font-size: 17px; letter-spacing: .04em; }
+.cr-field-word { font-size: 24px; letter-spacing: .26em; margin: 0 .2em; }
+.cr-ring {
+  display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  border: 1.5px solid var(--cr-line-strong); font-size: 16px; letter-spacing: 0;
+}
+
+/* proposition bets */
+.cr-props { display: grid; gap: 6px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.cr-prop .cr-art { gap: 3px; padding: 0 2px; }
+.cr-prop-big { font-size: 18px; letter-spacing: .2em; text-indent: .2em; }
+.cr-prop-name { font-size: 13px; letter-spacing: .14em; white-space: nowrap; }
+.cr-prop .cr-pay { opacity: .9; }
+.cr-prop-dice { height: 13px; }
+.cr-hard .cr-prop-dice, .cr-horn .cr-prop-dice { margin-bottom: 1px; }
+
+.cr-prop .cr-chips { align-items: center; justify-content: flex-end; padding-right: 6px; }
+
+
+/* ---------- Dice stage ---------- */
+
+.cr-stage {
+  --die: 46px;
+  position: relative; z-index: 7; pointer-events: none;
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  min-width: 0;
+}
+.cr-dice { flex: none; line-height: 0; }
+.cr-dice .dice-pair { gap: 0; }
+.cr-result {
+  display: flex; align-items: center; gap: 12px; flex: 0 1 auto; min-width: 0;
+  padding: 8px 18px 8px 8px; border-radius: 18px; max-width: 100%;
+}
+.cr-result-total {
+  display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%;
+  background: var(--fill-2); font-size: 17px; line-height: 1; font-weight: 600; color: var(--ink);
+}
+.cr-result-text { display: flex; flex-direction: column; min-width: 0; }
+.cr-result-title { font-size: 17px; line-height: 22px; font-weight: 600; letter-spacing: -.2px; color: var(--ink); white-space: normal; }
+.cr-result-net { display: flex; gap: 8px; font-size: 14px; line-height: 18px; font-weight: 500; color: var(--ink-2); }
+.cr-result-net[data-tone="good"] { color: var(--good); }
+.cr-result-net[data-tone="bad"] { color: var(--bad); }
+
+/* ---------- Dock ---------- */
+
+.cr-dock-wrap {
+  position: sticky; z-index: 25;
+  bottom: calc(var(--nav-h) + 12px + var(--safe-bottom) + var(--cr-dock-gap));
+}
+@media (min-width: 600px) { .cr-dock-wrap { bottom: 16px; } }
+.cr-dock {
+  display: flex; flex-direction: column; align-items: stretch; gap: 4px;
+  padding: 8px 10px 10px; border-radius: 28px;
+}
+.cr-dock .chip-rack.glass.cr-rack {
+  background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+  margin-inline: auto; border-radius: 0;
+}
+.cr-dock .chip-rack-row { padding: 10px 4px 8px; justify-content: center; }
+.cr-actions { display: flex; align-items: center; gap: 8px; }
+.cr-actions .cr-act { flex: 1 1 0; min-width: 0; padding-inline: 8px; font-size: 14px; gap: 6px; }
+.cr-actions .cr-act span { overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 479px) { .cr-act svg { display: none; } }
+.cr-roll-btn { flex: 1.25 1 0; min-width: 96px; }
+
+@media (min-width: 900px) {
+  .cr-dock { flex-direction: row; align-items: center; justify-content: space-between; gap: 20px; padding: 6px 14px 6px 8px; }
+  .cr-dock .chip-rack.glass.cr-rack { margin-inline: 0; }
+  .cr-dock .chip-rack-row { padding: 8px 4px 6px; }
+  .cr-actions { flex: none; }
+  .cr-actions .cr-act { flex: none; padding-inline: 16px; font-size: 15px; }
+  .cr-roll-btn { flex: none; min-width: 132px; }
+}
+
+.cr-hint-line { margin: 0; text-align: center; font-size: 13px; line-height: 18px; color: var(--ink-3); }
+
+/* ==========================================================================
+   Layouts (container queries on the felt: it knows its own width, whatever the shell does)
+   Phone: numbers 3x2, then come / don't come bar, dice, field, big 6 / 8, don't pass, pass, props.
+   ========================================================================== */
+
+/* phone (default) */
+.ga-n4 { grid-area: 1 / 1 / 2 / 3; }
+.ga-n5 { grid-area: 1 / 3 / 2 / 5; }
+.ga-n6 { grid-area: 1 / 5 / 2 / 7; }
+.ga-n8 { grid-area: 2 / 1 / 3 / 3; }
+.ga-n9 { grid-area: 2 / 3 / 3 / 5; }
+.ga-n10 { grid-area: 2 / 5 / 3 / 7; }
+.ga-come { grid-area: 3 / 1 / 4 / 5; height: 64px; }
+.ga-dcb, .cr-puck-bar.ga-dcb { grid-area: 3 / 5 / 4 / 7; height: 64px; }
+.cr-puck-bar { grid-area: 3 / 5 / 4 / 7; justify-self: start; align-self: start; }
+.cr-stage { grid-area: 4 / 1 / 5 / 7; height: 96px; }
+.ga-field { grid-area: 5 / 1 / 6 / 7; height: 66px; }
+.ga-big6 { grid-area: 6 / 1 / 7 / 4; height: 48px; }
+.ga-big8 { grid-area: 6 / 4 / 7 / 7; height: 48px; }
+.ga-dp { grid-area: 7 / 1 / 8 / 7; height: 48px; }
+.cr-table[data-lay] .ga-dp { grid-area: 7 / 1 / 8 / 5; }
+.ga-lay { grid-area: 7 / 5 / 8 / 7; height: 48px; }
+.ga-pass { grid-area: 8 / 1 / 9 / 7; height: 58px; }
+.cr-table[data-odds] .ga-pass { grid-area: 8 / 1 / 9 / 5; }
+.ga-odds { grid-area: 8 / 5 / 9 / 7; height: 58px; }
+.cr-props { grid-area: 9 / 1 / 10 / 7; margin-top: 4px; }
+
+.pr-h4 { grid-area: 1 / 1; } .pr-h6 { grid-area: 1 / 2; } .pr-h8 { grid-area: 1 / 3; } .pr-h10 { grid-area: 1 / 4; }
+.pr-seven { grid-area: 2 / 1 / 3 / 3; } .pr-craps { grid-area: 2 / 3 / 3 / 5; }
+.pr-o2 { grid-area: 3 / 1; } .pr-o3 { grid-area: 3 / 2; } .pr-o11 { grid-area: 3 / 3; } .pr-o12 { grid-area: 3 / 4; }
+.cr-props { grid-template-rows: 62px 52px 62px; }
+.cr-hard .cr-art, .cr-horn .cr-art { padding-bottom: 14px; }
+.cr-hard .cr-chips, .cr-horn .cr-chips { align-items: flex-end; justify-content: center; padding: 0 0 2px; }
+.cr-prop .cr-chips { padding-right: 0; }
+.cr-hard .cr-pay, .cr-horn .cr-pay { display: none; }
+
+/* phone-only tweaks */
+@container crapsfelt (max-width: 539px) {
+  .cr-come-text { font-size: 30px; }
+  .cr-dcb .cr-art { padding-left: 30px; }
+  .cr-dcb .cr-bar-text { font-size: 13px; }
+  .cr-stage { justify-content: space-between; padding-inline: 6px; }
+  .cr-result { padding: 6px 12px 6px 6px; gap: 8px; }
+  .cr-result-total { display: none; }
+  .cr-result { padding: 8px 14px; }
+  .cr-result-title { font-size: 16px; }
+  .cr-field-word { font-size: 20px; }
+  .cr-fnum { font-size: 15px; }
+  .cr-ring { width: 24px; height: 24px; font-size: 14px; }
+  .cr-pass-text { font-size: 22px; }
+  .cr-prop-name { font-size: 12px; letter-spacing: .08em; }
+  .cr-prop-big { font-size: 16px; }
+  .cr-tiny { font-size: 10px; }
+}
+
+/* mid: seven columns, props as a band underneath */
+@container crapsfelt (min-width: 540px) {
+  .cr-table { grid-template-columns: minmax(0, 1.1fr) repeat(6, minmax(0, 1fr)); gap: 8px; }
+  .ga-dcb { grid-area: 1 / 1 / 2 / 2; height: auto; }
+  .cr-puck-bar { grid-area: 1 / 1 / 2 / 2; }
+  .ga-n4 { grid-area: 1 / 2; } .ga-n5 { grid-area: 1 / 3; } .ga-n6 { grid-area: 1 / 4; }
+  .ga-n8 { grid-area: 1 / 5; } .ga-n9 { grid-area: 1 / 6; } .ga-n10 { grid-area: 1 / 7; }
+  .ga-big6 { grid-area: 2 / 1 / 3 / 2; height: auto; }
+  .ga-big8 { grid-area: 3 / 1 / 4 / 2; height: auto; }
+  .ga-come { grid-area: 2 / 2 / 3 / 8; height: 104px; }
+  .cr-stage { grid-area: 2 / 3 / 3 / 8; height: 104px; justify-content: flex-end; padding-right: 22px; }
+  .ga-field { grid-area: 3 / 2 / 4 / 8; height: 84px; }
+  .ga-dp { grid-area: 4 / 1 / 5 / 8; height: 50px; }
+  .cr-table[data-lay] .ga-dp { grid-area: 4 / 1 / 5 / 7; }
+  .ga-lay { grid-area: 4 / 7 / 5 / 8; height: 50px; }
+  .ga-pass { grid-area: 5 / 1 / 6 / 8; height: 64px; }
+  .cr-table[data-odds] .ga-pass { grid-area: 5 / 1 / 6 / 7; }
+  .ga-odds { grid-area: 5 / 7 / 6 / 8; height: 64px; }
+  .cr-props { grid-area: 6 / 1 / 7 / 8; margin-top: 6px; gap: 8px; grid-template-rows: 64px 56px 64px; }
+
+  .cr-num { min-height: 150px; }
+  .cr-numeral { font-size: 40px; }
+  .cr-numeral[data-word] { font-size: 28px; }
+  .cr-come-text { font-size: 34px; letter-spacing: .24em; }
+  .cr-result-total { display: none; }
+  .cr-result { padding: 8px 16px; }
+  .cr-come .cr-hit { justify-content: flex-start; padding-left: 36px; }
+  .cr-come .cr-chips { justify-content: flex-start; padding-left: 34%; }
+  .cr-come-text { text-indent: 0; }
+  .cr-dcb .cr-art { padding-left: 0; padding-top: 28px; gap: 8px; }
+  .cr-dcb .cr-bar-text { font-size: 16px; }
+  .cr-dcb .cr-bar-dice { display: block; height: 15px; }
+  .cr-dp .cr-bar-text { font-size: 16px; }
+  .cr-pass-text { font-size: 28px; }
+  .cr-big .cr-hit { border-radius: 10px; }
+  .cr-stage { --die: 54px; }
+  .cr-result { padding: 8px 20px 8px 8px; }
+}
+
+/* wide: props box sits at the right end, like the centre of a real table */
+@container crapsfelt (min-width: 860px) {
+  .cr-table { grid-template-columns: minmax(0, 1.1fr) repeat(6, minmax(0, 1fr)) minmax(0, 2.5fr); gap: 8px; }
+  .ga-dp { grid-area: 4 / 1 / 5 / 8; }
+  .cr-table[data-lay] .ga-dp { grid-area: 4 / 1 / 5 / 7; }
+  .ga-pass { grid-area: 5 / 1 / 6 / 8; }
+  .cr-table[data-odds] .ga-pass { grid-area: 5 / 1 / 6 / 7; }
+  .cr-props {
+    grid-area: 1 / 8 / 6 / 9; margin-top: 0; gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: 1.15fr 1fr 1fr 1fr 1fr 0.9fr;
+  }
+  .pr-seven { grid-area: 1 / 1 / 2 / 3; }
+  .pr-h4 { grid-area: 2 / 1; } .pr-h6 { grid-area: 2 / 2; }
+  .pr-h8 { grid-area: 3 / 1; } .pr-h10 { grid-area: 3 / 2; }
+  .pr-o2 { grid-area: 4 / 1; } .pr-o3 { grid-area: 4 / 2; }
+  .pr-o11 { grid-area: 5 / 1; } .pr-o12 { grid-area: 5 / 2; }
+  .pr-craps { grid-area: 6 / 1 / 7 / 3; }
+  .ga-come { height: 112px; }
+  .cr-stage { height: 112px; }
+  .ga-field { height: 88px; }
+  .ga-dp { height: 52px; }
+  .ga-pass { height: 70px; }
+  .cr-num { min-height: 170px; }
+  .cr-come-text { font-size: 44px; letter-spacing: .34em; }
+  .cr-result-total { display: grid; }
+  .cr-result { padding: 8px 20px 8px 8px; }
+  .cr-numeral { font-size: 46px; }
+  .cr-numeral[data-word] { font-size: 32px; }
+  .cr-prop-name { font-size: 14px; }
+  .cr-prop-big { font-size: 22px; }
+  .cr-hard .cr-pay, .cr-horn .cr-pay { display: block; }
+  .cr-hard .cr-art, .cr-horn .cr-art { padding-bottom: 0; }
+  .cr-hard .cr-chips, .cr-horn .cr-chips { align-items: center; justify-content: flex-end; padding: 0 6px 0 0; }
+  .cr-prop-dice { height: 15px; }
+  .cr-stage { --die: 58px; }
+  .cr-chips .cs-xs { --cw: 34px; }
+  .cr-chips .cs-sm { --cw: 42px; }
+  .cr-chips .cs-label { font-size: 12px; }
+}
+
+/* don't come bar bets on a number sit in a short strip: stack and amount side by side */
+.cr-lay .cs { flex-direction: row; gap: 4px; align-items: center; }
+.cr-lay .cs-label { font-size: 11px; }
