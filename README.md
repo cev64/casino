@@ -4,8 +4,8 @@ Blackjack and craps in the browser, with play money and provably fair randomness
 
 ## Features
 
-- **Blackjack.** Six-deck shoe, dealer stands on soft 17, blackjack pays 3 to 2. Hit, stand, double, split, insurance and surrender.
-- **Craps.** Pass and don't pass, come and don't come, odds, place, field, hardways and one-roll bets, with a dealer puck and a shooter's point.
+- **Blackjack.** Six-deck shoe, dealer stands on soft 17, blackjack pays 3 to 2. Dealer peeks for blackjack. Hit, stand, double (also after a split), split up to four hands, insurance, even money and late surrender.
+- **Craps.** Pass and don't pass, come and don't come with odds and lay odds (3-4-5x), place, Big 6 and 8, field, hardways and one-roll bets, with a dealer puck and a shooter's point. Tap to bet; press and hold or right-click to take a bet down.
 - **Provably fair.** Every shuffle and roll is derived from `SHA-256(serverSeed:clientSeed:nonce)`. The Provably fair sheet in Settings recomputes a roll or the opening cards of a shoe from seeds you paste in.
 - **History.** Results grouped by day with net result, win rate and a running chart. Clearing history can be undone.
 - **Settings.** System, light or dark theme, sound, haptics, and a balance reset that can be undone.
@@ -18,6 +18,11 @@ Blackjack and craps in the browser, with play money and provably fair randomness
 | `1` / `2` | Switch to Blackjack / Craps |
 | `?` | Open the rules for the current game |
 | `Esc` | Close a sheet |
+| `←` / `→` | Choose a chip |
+
+Blackjack: `Enter` deal or deal again, `H` hit, `S` stand, `D` double, `P` split, `U` surrender, `Y` / `N` insurance, `R` rebet, `C` clear, `Backspace` remove the last chip.
+
+Craps: `Space` or `R` roll, `U` or `Backspace` undo the last bet, `C` clear, `B` rebet, `Delete` on a focused spot takes that bet down.
 
 ## Design
 

@@ -267,7 +267,7 @@ export const CrapsTable = ({ active = true }) => {
   }, [active]);
 
   const handlersRef = useRef({});
-  handlersRef.current = { handleRoll, handleUndo, handleClear, handleRebet, setChip, balance };
+  handlersRef.current = { handleRoll, handleUndo, handleClear, handleRebet, setChip, chip, balance };
 
   useEffect(() => {
     if (!active) return undefined;
@@ -291,15 +291,18 @@ export const CrapsTable = ({ active = true }) => {
       } else if (key === 'b' || key === 'B') {
         e.preventDefault();
         h.handleRebet();
-      } else if (/^[1-9]$/.test(key)) {
-        const v = RACK_VALUES[Number(key) - 1];
-        if (v) {
-          e.preventDefault(); // the app's 1/2 table switch must not fire while this table is open
-          if (v <= h.balance) h.setChip(v);
+      } else if ((key === 'ArrowRight' || key === 'ArrowLeft') && !e.target.closest?.('[role="radiogroup"]')) {
+        // Same as blackjack: arrows step through affordable chips (the rack handles its own arrows when focused)
+        e.preventDefault();
+        const i = RACK_VALUES.indexOf(h.chip);
+        const dir = key === 'ArrowRight' ? 1 : -1;
+        for (let s = 1; s <= RACK_VALUES.length; s += 1) {
+          const v = RACK_VALUES[(i + dir * s + RACK_VALUES.length * 2) % RACK_VALUES.length];
+          if (v <= h.balance) { h.setChip(v); break; }
         }
       }
     };
-    // capture: this table's keys win over the shell's global 1 / 2 shortcuts
+    // capture: this table's keys win over the shell's global shortcuts
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [active]);
