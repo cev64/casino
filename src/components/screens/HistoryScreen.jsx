@@ -92,10 +92,15 @@ export const HistoryScreen = () => {
     });
   }, [rows]);
 
+  const hasGameRecords = filter === 'all' ? gameHistory.length > 0 : gameHistory.some((r) => (r?.type || r?.game) === filter);
+  const clearLabel = filter === 'all' ? 'Clear history' : `Clear ${filter} history`;
+
   const onClear = () => {
-    const previous = clearHistory();
-    if (!previous.length) return;
-    toast('History cleared', { action: { label: 'Undo', onClick: () => restoreHistory(previous) } });
+    const removed = clearHistory(filter === 'all' ? null : filter);
+    if (!removed.length) return;
+    toast(filter === 'all' ? 'History cleared' : `${GAME_NAME[filter]} history cleared`, {
+      action: { label: 'Undo', onClick: () => restoreHistory(removed) },
+    });
   };
 
   const winRate = stats.winRate === null ? '—' : `${Math.round(stats.winRate * 100)}%`;
@@ -144,9 +149,9 @@ export const HistoryScreen = () => {
           </div>
         )}
 
-        {gameHistory.length > 0 && (
+        {hasGameRecords && (
           <div className="flex justify-center pt-2">
-            <Button variant="destructive" size="sm" onClick={onClear}>Clear history</Button>
+            <Button variant="destructive" size="sm" onClick={onClear}>{clearLabel}</Button>
           </div>
         )}
       </div>

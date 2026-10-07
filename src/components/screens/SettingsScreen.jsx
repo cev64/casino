@@ -81,7 +81,7 @@ export const SettingsScreen = ({ onOpenRules, onOpenFairness }) => {
             <RollingNumber value={balance} className="text-[16px] leading-6 font-medium text-ink" />
           </Row>
           <div className="px-1 pb-1 pt-1">
-            <Button variant="ghost" block onClick={resetBalance}>Reset balance</Button>
+            <Button variant={balance < 1 ? 'primary' : 'ghost'} block onClick={resetBalance}>Reset balance</Button>
           </div>
         </Group>
       </div>

@@ -3,6 +3,7 @@
  *
  * Current:  { type, bet, payout, netWin, result, endedAt, timestamp, id }
  * Legacy:   { game, outcome | result, roll, outcomes[], bet?, payout?, timestamp }
+ * Records without a known game and a valid timestamp are malformed: normalizeRecord returns null.
  */
 
 export const STATUS_LABEL = {
@@ -53,9 +54,13 @@ const crapsFromOutcomes = (outcomes) => {
 
 export const normalizeRecord = (r, index = 0) => {
   if (!r || typeof r !== 'object') return null;
-  const game = (r.type || r.game || 'blackjack') === 'craps' ? 'craps' : 'blackjack';
-  const ts = new Date(r.endedAt || r.timestamp || r.startedAt || 0);
-  const time = Number.isNaN(ts.getTime()) ? null : ts;
+  // Records need a known game and a real timestamp; anything else is malformed and skipped.
+  const game = r.type || r.game;
+  if (game !== 'blackjack' && game !== 'craps') return null;
+  const rawTime = r.endedAt || r.timestamp || r.startedAt;
+  if (!rawTime) return null;
+  const time = new Date(rawTime);
+  if (Number.isNaN(time.getTime())) return null;
 
   let bet = num(r.bet) ?? 0;
   let net = num(r.netWin);
@@ -142,3 +147,31 @@ export const groupByDay = (rows, now = new Date()) => {
 
 export const formatTime = (date) =>
   date ? date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
+
+const gameOf = (r) => (r && typeof r === 'object' ? r.type || r.game : undefined);
+
+/**
+ * Splits raw stored records into those kept and those removed. With a game, only that game's
+ * records are removed; without one, everything is. `removed` remembers each record's position
+ * (from the start and from the end, since new records are added at the front) so
+ * `reinsertRemoved` can put it back exactly where it was.
+ */
+export const removeRecords = (records, game = null) => {
+  const list = Array.isArray(records) ? records : [];
+  const kept = [];
+  const removed = [];
+  list.forEach((record, index) => {
+    if (!game || gameOf(record) === game) removed.push({ record, index, fromEnd: list.length - 1 - index });
+    else kept.push(record);
+  });
+  return { kept, removed };
+};
+
+/** Undo for removeRecords: inserts the removed records at their original positions. */
+export const reinsertRemoved = (records, removed) => {
+  const out = Array.isArray(records) ? [...records] : [];
+  // Latest-positioned first: everything after a record is already in place when it goes back.
+  const sorted = [...(Array.isArray(removed) ? removed : [])].sort((a, b) => a.fromEnd - b.fromEnd);
+  for (const { record, fromEnd } of sorted) out.splice(Math.max(0, out.length - fromEnd), 0, record);
+  return out;
+};

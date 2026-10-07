@@ -7,6 +7,7 @@ import { BottomNav, SideRail } from './components/layout/Navigation';
 import { TopBar } from './components/layout/TopBar';
 import { getDestination } from './components/layout/destinations';
 import { useDestination } from './components/layout/useDestination';
+import { useOutOfChips } from './components/layout/useOutOfChips';
 import { HistoryScreen } from './components/screens/HistoryScreen';
 import { SettingsScreen } from './components/screens/SettingsScreen';
 import { RulesSheet } from './components/screens/RulesSheet';
@@ -31,6 +32,7 @@ const readSafeTop = () => {
 function App() {
   const [current, navigate] = useDestination();
   const dest = getDestination(current);
+  useOutOfChips();
 
   const [rulesOpen, setRulesOpen] = useState(false);
   const [fairOpen, setFairOpen] = useState(false);

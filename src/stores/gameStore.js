@@ -1,8 +1,17 @@
 import { create } from 'zustand';
-import { getGameHistory, addGameToHistory, clearGameHistory } from '../utils/localStorage';
+import { getGameHistory, addGameToHistory } from '../utils/localStorage';
+import { reinsertRemoved, removeRecords } from '../components/screens/historyModel';
 
 // Same key as STORAGE_KEYS.GAME_HISTORY in utils/localStorage.js (used to restore after Undo).
 const HISTORY_KEY = 'casino_game_history';
+
+const writeHistory = (records) => {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(records));
+  } catch (error) {
+    console.error('Error saving game history:', error);
+  }
+};
 
 export const useGameStore = create((set, get) => ({
   currentGame: null,
@@ -32,21 +41,20 @@ export const useGameStore = create((set, get) => ({
     set({ gameHistory: getGameHistory() });
   },
 
-  /** Empties the history and returns the previous records so the caller can offer Undo. */
-  clearHistory: () => {
-    const previous = getGameHistory();
-    clearGameHistory();
-    set({ gameHistory: [] });
-    return previous;
+  /**
+   * Removes history records: only one game's when `game` is given, otherwise all. Returns the
+   * removed records with their positions so the caller can offer Undo via restoreHistory.
+   */
+  clearHistory: (game = null) => {
+    const { kept, removed } = removeRecords(getGameHistory(), game);
+    writeHistory(kept);
+    set({ gameHistory: getGameHistory() });
+    return removed;
   },
 
-  /** Puts records back (Undo for clearHistory). */
-  restoreHistory: (records) => {
-    try {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(Array.isArray(records) ? records : []));
-    } catch (error) {
-      console.error('Error restoring game history:', error);
-    }
+  /** Undo for clearHistory: puts the removed records back where they were. */
+  restoreHistory: (removed) => {
+    writeHistory(reinsertRemoved(getGameHistory(), removed));
     set({ gameHistory: getGameHistory() });
   }
 }));

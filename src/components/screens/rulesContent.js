@@ -29,6 +29,7 @@ export const RULES = {
           { term: 'Split', text: 'Split a pair of the same rank into two hands, up to four. Split aces get one card each.' },
           { term: 'Surrender', text: 'Give up the hand on your first decision and get half the bet back. Not after a split.' },
           { term: 'Insurance', text: 'Offered when the dealer shows an ace. Costs half the bet and pays 2 to 1 if the dealer has blackjack.' },
+          { term: 'Even money', text: 'With a blackjack against a dealer ace, take 1 to 1 immediately instead of insurance.' },
         ],
       },
       {
@@ -128,6 +129,7 @@ export const RULES = {
         kind: 'terms',
         items: [
           { term: 'Odds limits', text: 'Pass and Come odds up to 3x on 4 and 10, 4x on 5 and 9, 5x on 6 and 8. Lay odds up to 6x.' },
+          { term: 'Come and lay odds', text: 'Odds on Come and Don’t Come bets are off on the come out roll. If that roll would settle them, the odds are returned as a push.' },
           { term: 'Place bets', text: 'Off on the come out roll. They stay up after a win and lose on a 7.' },
           { term: 'Hardways', text: 'Off on the come out roll. They stay up after a win and lose on a 7 or when the number rolls the easy way.' },
           { term: 'Big 6 and Big 8', text: 'Pay 1 to 1 and lose on any 7.' },

@@ -10,7 +10,7 @@ const MODES = [
   { value: 'blackjack', label: 'Blackjack shoe' },
 ];
 
-const Field = ({ id, label, value, onChange, placeholder, inputMode, mono }) => (
+const Field = ({ id, label, value, onChange, placeholder, inputMode, mono, error }) => (
   <div>
     <label htmlFor={id} className="t-micro block mb-1.5">{label}</label>
     <input
@@ -23,8 +23,11 @@ const Field = ({ id, label, value, onChange, placeholder, inputMode, mono }) => 
       autoComplete="off"
       autoCapitalize="off"
       spellCheck={false}
+      aria-invalid={error ? true : undefined}
+      aria-describedby={error ? `${id}-error` : undefined}
       style={mono ? { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace', fontSize: 13 } : undefined}
     />
+    {error && <p id={`${id}-error`} className="text-[14px] leading-5 text-ink-2 mt-1.5">{error}</p>}
   </div>
 );
 
@@ -43,8 +46,11 @@ export const FairnessSheet = ({ open, onClose }) => {
   const [nonce, setNonce] = useState('0');
   const [out, setOut] = useState(null);
 
-  const n = Number.parseInt(nonce, 10);
-  const ready = serverSeed.trim() && clientSeed.trim() && Number.isInteger(n) && n >= 0;
+  const nonceText = nonce.trim();
+  const nonceValid = /^\d+$/.test(nonceText) && Number.isSafeInteger(Number(nonceText));
+  const nonceError = nonceText !== '' && !nonceValid ? 'Use a whole number, 0 or more.' : null;
+  const n = nonceValid ? Number(nonceText) : NaN;
+  const ready = !!serverSeed.trim() && !!clientSeed.trim() && nonceValid;
 
   useEffect(() => {
     if (!open || !ready) { setOut(null); return undefined; }
@@ -76,13 +82,13 @@ export const FairnessSheet = ({ open, onClose }) => {
   return (
     <Sheet open={open} onClose={onClose} title="Provably fair">
       <p className="text-ink-2">
-        Every roll and shuffle comes from a hash of three values, so you can check any result yourself.
+        Dice and shuffles come from SHA-256 hashes of three values, so a result can be recomputed from them.
       </p>
 
       <ul className="rule-list mt-5">
         <li className="flex-col !gap-0.5 sm:flex-row sm:!gap-6">
           <span className="rule-term sm:min-w-[96px]">Server seed</span>
-          <span className="rule-text sm:flex-1">Random, created before play. Only its hash is shown until a session ends.</span>
+          <span className="rule-text sm:flex-1">Random, created when a table starts.</span>
         </li>
         <li className="flex-col !gap-0.5 sm:flex-row sm:!gap-6">
           <span className="rule-term sm:min-w-[96px]">Client seed</span>
@@ -90,18 +96,21 @@ export const FairnessSheet = ({ open, onClose }) => {
         </li>
         <li className="flex-col !gap-0.5 sm:flex-row sm:!gap-6">
           <span className="rule-term sm:min-w-[96px]">Nonce</span>
-          <span className="rule-text sm:flex-1">A counter that makes every roll different.</span>
+          <span className="rule-text sm:flex-1">A counter. Craps adds one per roll. A blackjack shoe hashes one nonce per card.</span>
         </li>
       </ul>
       <p className="mono-block mt-4">SHA-256(serverSeed:clientSeed:nonce)</p>
+      <p className="text-ink-2 mt-4">
+        Seeds are not shown during play. The verifier recomputes outcomes from seeds you enter, so you can check the method with your own.
+      </p>
 
       <h3 className="t-micro mt-8 mb-3">Verify</h3>
       <SegmentedControl label="What to verify" options={MODES} value={mode} onChange={setMode} className="w-full mb-4" size="sm" />
 
       <div className="grid gap-3">
-        <Field id="fair-server" label="Server seed" value={serverSeed} onChange={setServerSeed} placeholder="Paste server seed" mono />
-        <Field id="fair-client" label="Client seed" value={clientSeed} onChange={setClientSeed} placeholder="Paste client seed" mono />
-        <Field id="fair-nonce" label="Nonce" value={nonce} onChange={setNonce} inputMode="numeric" placeholder="0" />
+        <Field id="fair-server" label="Server seed" value={serverSeed} onChange={setServerSeed} placeholder="Enter server seed" mono />
+        <Field id="fair-client" label="Client seed" value={clientSeed} onChange={setClientSeed} placeholder="Enter client seed" mono />
+        <Field id="fair-nonce" label="Nonce" value={nonce} onChange={setNonce} inputMode="numeric" placeholder="0" error={nonceError} />
       </div>
 
       <div className="mt-4">

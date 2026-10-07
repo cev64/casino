@@ -36,10 +36,17 @@ export const useDestination = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const currentRef = useRef(current);
+  currentRef.current = current;
+
   useEffect(() => {
     const onPop = () => {
       const id = fromHash();
       if (id) setCurrent(id);
+      else if (window.location.hash !== `#/${currentRef.current}`) {
+        // Unknown hash (typed or pasted): keep the current screen and tidy the URL.
+        window.history.replaceState(null, '', `#/${currentRef.current}`);
+      }
     };
     window.addEventListener('popstate', onPop);
     window.addEventListener('hashchange', onPop);
@@ -50,9 +57,6 @@ export const useDestination = () => {
   }, []);
 
   useEffect(() => { writeStored(current); }, [current]);
-
-  const currentRef = useRef(current);
-  currentRef.current = current;
 
   const navigate = useCallback((id) => {
     if (!isDestination(id) || id === currentRef.current) return;
