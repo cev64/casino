@@ -5,9 +5,11 @@ const prefersReduced = () =>
 
 /** Money formatting with a real minus sign (U+2212) and optional explicit plus. */
 export const formatMoney = (n, { signed = false, cents = false } = {}) => {
+  // Whole dollars unless asked for cents or the amount has a fraction (3:2 on an odd bet) — then always 2 places.
+  const showCents = cents || Math.round(Math.abs(n) * 100) % 100 !== 0;
   const abs = Math.abs(n).toLocaleString('en-US', {
-    minimumFractionDigits: cents ? 2 : 0,
-    maximumFractionDigits: cents ? 2 : (Number.isInteger(n) ? 0 : 2),
+    minimumFractionDigits: showCents ? 2 : 0,
+    maximumFractionDigits: showCents ? 2 : 0,
   });
   if (n < 0) return `−$${abs}`;
   if (signed && n > 0) return `+$${abs}`;
@@ -33,6 +35,7 @@ export const RollingNumber = ({ value, format = formatMoney, className = '', dur
     const tick = (now) => {
       const t = Math.min(1, (now - start) / duration);
       const v = a + (b - a) * ease(t);
+      // Roll in whole dollars, land on the exact value
       setDisplay(t >= 1 ? b : Math.round(v));
       if (t < 1) raf.current = requestAnimationFrame(tick);
     };

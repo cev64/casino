@@ -1,1 +1,216 @@
-/* blackjack styles — owned by the blackjack workstream */
+/* ==========================================================================
+   Blackjack table. Felt, cards and chips come from objects.css; this file lays them out
+   and styles the glass chrome (value pills, control dock). No glows, no coloured stripes.
+   ========================================================================== */
+
+.bj-table {
+  --ring: 66px;
+  --pill-h: 26px;
+  --bj-good: #4ADE80; /* pills sit on dark felt in both themes */
+  --bj-bad: #FF8585;
+  display: flex; flex-direction: column; gap: 12px;
+  width: 100%;
+}
+.bj-table[data-size="sm"] { --bj-cw: calc(var(--pc-base) * .74); }
+.bj-table[data-size="md"] { --bj-cw: var(--pc-base); --ring: 78px; }
+.bj-table[data-size="lg"] { --bj-cw: calc(var(--pc-base) * 1.22); --ring: 90px; }
+
+.bj-felt .felt-content { position: relative; padding: calc(var(--felt-pad) * .6) var(--felt-pad) var(--felt-pad); }
+
+.bj-stage {
+  position: relative;
+  display: flex; flex-direction: column; align-items: stretch; gap: 6px;
+}
+
+/* ---------- Shoe ---------- */
+
+.bj-shoe {
+  position: absolute; z-index: 3;
+  top: calc(var(--rail) + 8px); right: calc(var(--rail) + 10px);
+  display: flex; flex-direction: column; align-items: flex-end; gap: 0;
+  pointer-events: none;
+}
+.bj-shoe-svg { width: 74px; height: auto; display: block; filter: drop-shadow(0 4px 6px rgb(0 0 0 / .35)); }
+.bj-shoe-read { font-size: 10px; line-height: 14px; letter-spacing: .16em; text-indent: 0; margin-top: -2px; }
+.bj-table[data-size="md"] .bj-shoe-svg { width: 92px; }
+.bj-table[data-size="lg"] .bj-shoe-svg { width: 112px; }
+.bj-table[data-size="lg"] .bj-shoe-read { font-size: 11px; }
+
+/* ---------- Zones ---------- */
+
+.bj-dealer, .bj-hand-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.bj-hand-space {
+  display: flex; justify-content: center; align-items: flex-start;
+  min-height: calc(var(--bj-cw) * 1.4 + 16px);
+  max-width: 100%;
+  transition: min-height .4s var(--ease);
+}
+.bj-table[data-mode="betting"] .bj-hand-space { min-height: calc(var(--bj-cw) * .7); }
+.bj-pill-slot {
+  display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: nowrap;
+  min-height: var(--pill-h);
+}
+
+.bj-player {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
+  justify-content: center; align-items: start; gap: 8px;
+  width: 100%; max-width: 760px; margin-inline: auto;
+}
+.bj-player[data-count="1"] { grid-auto-columns: minmax(0, 360px); }
+.bj-hand-col { min-width: 0; }
+.bj-hand-name { min-height: 16px; color: rgb(var(--felt-ink) / .78); transition: color .2s var(--ease); }
+.bj-hand-name[data-on] { color: #F6F7F2; }
+.bj-hand-col:not([data-multi]) .bj-hand-name { display: none; }
+
+/* A doubled hand: the last card lies on its side, face down until the showdown. */
+.bj-hand-space[data-doubled] .hand-slot:last-child {
+  rotate: 90deg;
+  margin-left: calc(var(--bj-cw) * -.12);
+  margin-right: calc(var(--bj-cw) * .22);
+  translate: 0 calc(var(--bj-cw) * .22);
+}
+
+/* ---------- Printed felt ---------- */
+
+.bj-print-block {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 2px 0;
+  min-height: 52px; justify-content: center;
+}
+.bj-print-main { font-size: 12px; letter-spacing: .24em; }
+.bj-print-sub { font-size: 10px; line-height: 14px; letter-spacing: .2em; opacity: .85; }
+.bj-chat {
+  position: absolute; inset: 0; z-index: 4;
+  display: grid; place-items: center; pointer-events: none;
+}
+.bj-chat .dealer-chat { width: 100%; }
+
+/* ---------- Value pills (glass on felt) ---------- */
+
+.bj-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: var(--pill-h); padding: 0 11px;
+  border-radius: 999px;
+  font-size: 13px; line-height: 1; font-weight: 600; letter-spacing: .005em;
+  white-space: nowrap;
+  color: #F4F6F0;
+  background: rgba(7, 20, 14, .58);
+  -webkit-backdrop-filter: blur(12px) saturate(140%); backdrop-filter: blur(12px) saturate(140%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .13), 0 0 0 1px rgba(255, 255, 255, .05), 0 3px 8px -3px rgba(0, 0, 0, .5);
+  animation: bj-pill-in .28s var(--ease) both;
+  transition: background-color .25s var(--ease), color .25s var(--ease);
+}
+.bj-pill[data-active] {
+  background: rgba(255, 255, 255, .93); color: #0B2A1D;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 12px -2px rgba(0, 0, 0, .4);
+}
+.bj-pill[data-tone="bust"] { color: var(--bj-bad); }
+.bj-pill-quiet { background: rgba(7, 20, 14, .42); color: rgb(var(--felt-ink) / .95); font-weight: 500; }
+.bj-result b { font-weight: 600; }
+.bj-result[data-tone="good"] .bj-result-amt { color: var(--bj-good); }
+.bj-result[data-tone="bad"] .bj-result-amt { color: var(--bj-bad); }
+.bj-result[data-tone="neutral"] .bj-result-word { color: rgb(var(--felt-ink) / .95); }
+.bj-result-val { opacity: .8; padding-right: 6px; margin-right: 0; box-shadow: 1px 0 0 rgba(255,255,255,.0); }
+.bj-result-val::after { content: '·'; padding-left: 6px; opacity: .6; }
+.bj-total { height: 28px; margin-bottom: 4px; }
+.bj-total[data-tone="good"] b { color: var(--bj-good); }
+.bj-total[data-tone="bad"] b { color: var(--bj-bad); }
+@keyframes bj-pill-in { from { opacity: 0; transform: translateY(3px) scale(.96); } to { opacity: 1; transform: none; } }
+
+/* ---------- Betting circle ---------- */
+
+.bj-circle-wrap { position: relative; width: var(--ring); height: var(--ring); flex: none; margin-top: 2px; }
+.bj-circle {
+  position: absolute; inset: 0; border: 0; padding: 0; background: none; border-radius: 50%;
+  display: grid; place-items: center; cursor: default; color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+.bj-circle[data-interactive] { cursor: pointer; }
+.bj-circle-ring {
+  position: absolute; inset: 0; border-radius: 50%;
+  border: 1.5px solid rgb(var(--felt-ink) / .5);
+  box-shadow: inset 0 0 0 5px rgb(var(--felt-ink) / .0), inset 0 1px 2px rgba(0, 0, 0, .25);
+  transition: border-color .2s var(--ease), transform .15s var(--ease), background-color .2s var(--ease);
+}
+.bj-circle[data-interactive]:hover .bj-circle-ring { border-color: rgb(var(--felt-ink) / .85); background: rgb(var(--felt-ink) / .06); }
+.bj-circle[data-interactive]:active .bj-circle-ring { transform: scale(.96); }
+.bj-circle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 50%; }
+.bj-circle-word { position: relative; font-size: 10px; letter-spacing: .24em; }
+.bj-circle-chips {
+  position: absolute; inset: 0; pointer-events: none;
+  display: grid; place-items: center;
+}
+.bj-stake { grid-area: 1 / 1; display: grid; place-items: center; margin-top: 2px; }
+.bj-payout-pos { position: absolute; left: 62%; top: 12%; z-index: 2; }
+.bj-flight { position: absolute; left: 50%; top: 50%; width: 32px; height: 32px; margin: -16px 0 0 -16px; z-index: 3; }
+.bj-flight .chip { display: block; }
+
+/* ---------- Control dock ---------- */
+
+.bj-dock {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 12px 12px;
+  width: 100%; max-width: 760px; margin-inline: auto;
+  border-radius: var(--r-card);
+}
+.bj-dock .chip-rack {
+  width: 100%; border-radius: 0; background: transparent;
+  box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.bj-dock .chip-rack-row { padding: 8px 0 6px; justify-content: space-between; gap: 0; }
+.bj-dock .chip-rack-size { --chip-w: clamp(34px, calc((100vw - 104px) / 6), 56px); }
+.bj-dock-row { display: grid; gap: 8px; }
+.bj-dock-row > button, .bj-dock-sub button { padding-inline: 8px; white-space: nowrap; }
+.bj-dock-betting { grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.35fr); }
+.bj-ico { display: none; }
+.bj-dock-betting .bj-lbl { margin-left: 0; }
+.bj-dock-play { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.bj-dock-insurance { grid-template-columns: minmax(0, 1fr) 76px 76px; align-items: center; }
+.bj-dock-result { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); }
+.bj-dock-sub { display: flex; justify-content: center; margin-top: -2px; }
+.bj-action { min-height: 54px; }
+.bj-ask { display: flex; flex-direction: column; min-width: 0; padding-left: 4px; }
+.bj-ask-title { font-size: 17px; line-height: 22px; font-weight: 600; letter-spacing: -.2px; color: var(--ink); }
+.bj-ask-meta { font-size: 13px; line-height: 18px; color: var(--ink-3); }
+
+.bj-key { display: none; }
+@media (min-width: 1024px) {
+  .bj-key {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 20px; height: 20px; margin-left: 8px; padding: 0 5px;
+    border-radius: 6px; background: var(--fill-2); color: var(--ink-3);
+    font: 600 11px/1 'Inter', sans-serif; letter-spacing: 0;
+  }
+  .bj-dock-play .bj-action { gap: 0; }
+}
+
+@media (min-width: 600px) {
+  .bj-ico { display: inline-block; margin-right: 6px; }
+  .bj-dock .chip-rack-row { justify-content: center; gap: 8px; }
+  .bj-table { gap: 14px; }
+  .bj-dock { padding: 12px 16px 16px; }
+  .bj-print-main { font-size: 13px; }
+  .bj-print-sub { font-size: 11px; }
+  .bj-pill { --pill-h: 28px; font-size: 14px; }
+  .bj-pill-slot { min-height: 28px; }
+}
+
+/* Ghost buttons in the dock sit a little lower-contrast when disabled: keep their footprint */
+.bj-dock button:disabled { opacity: .38; }
+
+/* Chat bubble and the round total sit over the printed text; the print steps back */
+.bj-print-block .felt-print { transition: opacity .25s var(--ease); }
+.bj-print-block:has(.dealer-chat > div) .felt-print,
+.bj-print-block[data-total] .felt-print { opacity: 0; }
+.bj-total-wrap { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; pointer-events: none; }
+
+/* Wide: one row for chips and buttons, so table + dock fit a laptop screen */
+@media (min-width: 900px) {
+  .bj-dock[data-mode="betting"] { flex-direction: row; align-items: center; gap: 20px; max-width: 980px; padding: 8px 16px; }
+  .bj-dock[data-mode="betting"] .chip-rack { width: auto; flex: none; }
+  .bj-dock[data-mode="betting"] .chip-rack-row { padding: 4px 0; }
+  .bj-dock[data-mode="betting"] .bj-dock-row { flex: 1; min-width: 0; }
+  .bj-dock[data-mode="play"], .bj-dock[data-mode="insurance"], .bj-dock[data-mode="result"] { padding-block: 10px; }
+}
+.bj-deal .bj-key { background: color-mix(in srgb, var(--on-accent) 18%, transparent); color: var(--on-accent); }
