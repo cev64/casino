@@ -48,6 +48,7 @@ export const useBlackjack = () => {
           startedAt: new Date().toISOString(),
         }),
         end: (record) => useGameStore.getState().endGame(record),
+        cancel: () => useGameStore.getState().setCurrentGame(null),
       },
     });
   }
@@ -102,6 +103,23 @@ export const useBlackjack = () => {
   }, [session]);
 
   useEffect(() => () => clearTimeout(fallbackRef.current), []);
+
+  // The engine doesn't survive leaving the page: pay out a finished round, refund a hand in play.
+  useEffect(() => {
+    const leave = () => {
+      clearTimeout(fallbackRef.current);
+      session.abandon();
+    };
+    const onHide = (e) => {
+      if (e.persisted) return; // bfcache: the page (and engine) comes back intact
+      leave();
+    };
+    window.addEventListener('pagehide', onHide);
+    return () => {
+      window.removeEventListener('pagehide', onHide);
+      leave();
+    };
+  }, [session]);
 
   return {
     gameState,

@@ -847,3 +847,77 @@ describe('wallet reconciliation', () => {
     expect(wallet.cash).toBe(50);
   });
 });
+
+describe('leaving the page (abandon)', () => {
+  it('pays out and records a finished round that is still waiting to settle', async () => {
+    const wallet = makeWallet();
+    const records = [];
+    const session = new BlackjackSession({ wallet, deferSettle: true, history: { begin() {}, end: (r) => records.push(r) } });
+    await session.initialize();
+    rig(session.engine, ['10', '10', '9', '8']);
+    await session.deal(25);
+    await session.stand();
+    expect(wallet.cash).toBe(975); // reveal still running
+    const out = session.abandon();
+    expect(out.settled).not.toBeNull();
+    expect(wallet.cash).toBe(1025);
+    expect(records).toHaveLength(1);
+    expect(records[0].netWin).toBe(25);
+    session.abandon();
+    expect(wallet.cash).toBe(1025);
+    expect(records).toHaveLength(1);
+  });
+
+  it('refunds the stake of a hand in play and writes no history', async () => {
+    const wallet = makeWallet();
+    const records = [];
+    let cancelled = 0;
+    const session = new BlackjackSession({ wallet, deferSettle: true, history: { begin() {}, end: (r) => records.push(r), cancel: () => { cancelled += 1; } } });
+    await session.initialize();
+    rig(session.engine, ['10', '10', '6', '7']);
+    await session.deal(25);
+    expect(session.engine.gameState).toBe('player-turn');
+    expect(wallet.cash).toBe(975);
+    const out = session.abandon();
+    expect(out.refunded).toBe(25);
+    expect(wallet.cash).toBe(1000);
+    expect(records).toHaveLength(0);
+    expect(cancelled).toBe(1);
+    session.abandon();
+    expect(wallet.cash).toBe(1000);
+  });
+
+  it('refunds doubles, splits and insurance too', async () => {
+    const wallet = makeWallet();
+    const session = new BlackjackSession({ wallet, deferSettle: true });
+    await session.initialize();
+    rig(session.engine, ['8', '10', '8', '7', '3', '9', '4']);
+    await session.deal(100);
+    await session.split(); // second stake
+    await session.double(); // third stake
+    expect(wallet.cash).toBe(700);
+    session.abandon();
+    expect(wallet.cash).toBe(1000);
+
+    const w2 = makeWallet();
+    const s2 = new BlackjackSession({ wallet: w2, deferSettle: true });
+    await s2.initialize();
+    rig(s2.engine, ['10', 'A', '10', '6', '10']);
+    await s2.deal(100);
+    await s2.insurance(true);
+    expect(s2.engine.gameState).toBe('player-turn');
+    expect(w2.cash).toBe(850);
+    s2.abandon();
+    expect(w2.cash).toBe(1000);
+  });
+
+  it('can deal again after an abandoned round', async () => {
+    const { session, wallet } = await makeSession(['10', '10', '6', '7', '10', '10', '9', '8']);
+    await session.deal(50);
+    session.abandon();
+    expect(wallet.cash).toBe(1000);
+    const r = await session.deal(50);
+    expect(r.ok).toBe(true);
+  });
+});
+

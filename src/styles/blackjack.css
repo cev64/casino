@@ -8,12 +8,16 @@
   --pill-h: 26px;
   --bj-good: #4ADE80; /* pills sit on dark felt in both themes */
   --bj-bad: #FF8585;
+  --bj-scale: 1; /* card scale; shrinks on short viewports so table + dock fit without scrolling */
+  --bj-cw: calc(var(--bj-cw0) * var(--bj-scale));
   display: flex; flex-direction: column; gap: 12px;
   width: 100%;
 }
-.bj-table[data-size="sm"] { --bj-cw: calc(var(--pc-base) * .74); }
-.bj-table[data-size="md"] { --bj-cw: var(--pc-base); --ring: 78px; }
-.bj-table[data-size="lg"] { --bj-cw: calc(var(--pc-base) * 1.22); --ring: 90px; }
+.bj-table[data-size="sm"] { --bj-cw0: calc(var(--pc-base) * .74); }
+.bj-table[data-size="md"] { --bj-cw0: var(--pc-base); --ring: 78px; }
+.bj-table[data-size="lg"] { --bj-cw0: calc(var(--pc-base) * 1.22); --ring: 90px; }
+/* Card width is driven here, so a hand can be narrower than its size class when it has to be. */
+.bj-table .bj-hand-space .pc, .bj-table .bj-hand-space .hand-fan { --pc-w: var(--bj-cw); }
 
 .bj-felt .felt-content { position: relative; padding: calc(var(--felt-pad) * .6) var(--felt-pad) var(--felt-pad); }
 
@@ -47,6 +51,7 @@
 }
 .bj-table[data-mode="betting"] .bj-hand-space { min-height: calc(var(--bj-cw) * .7); }
 .bj-pill-slot {
+  min-width: 0; max-width: 100%;
   display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: nowrap;
   min-height: var(--pill-h);
 }
@@ -57,10 +62,31 @@
   width: 100%; max-width: 760px; margin-inline: auto;
 }
 .bj-player[data-count="1"] { grid-auto-columns: minmax(0, 360px); }
-.bj-hand-col { min-width: 0; }
-.bj-hand-name { min-height: 16px; color: rgb(var(--felt-ink) / .78); transition: color .2s var(--ease); }
+.bj-hand-col { min-width: 0; container-type: inline-size; }
+.bj-hand-name { min-height: 16px; white-space: nowrap; color: rgb(var(--felt-ink) / .78); transition: color .2s var(--ease); }
 .bj-hand-name[data-on] { color: #F6F7F2; }
 .bj-hand-col:not([data-multi]) .bj-hand-name { display: none; }
+/* "Playing" shows when the column has room; otherwise a dot marks the active hand */
+.bj-hand-state { display: none; }
+.bj-hand-name[data-on]::before {
+  content: ''; display: inline-block; width: 5px; height: 5px; margin: 0 5px 1px 0; border-radius: 50%;
+  background: currentColor; vertical-align: middle;
+}
+@container (min-width: 132px) {
+  .bj-hand-state { display: inline; }
+  .bj-hand-name[data-on]::before { display: none; }
+}
+
+/* Several hands share one row: each hand's cards shrink and fan tighter so they stay in their column. */
+.bj-player { --fan: .36; }
+.bj-hand-space[data-multi] {
+  --bj-cw: min(calc(var(--bj-cw0) * var(--bj-scale)), calc((100cqw - 6px) / (1 + (var(--n, 2) - 1) * var(--fan))));
+}
+.bj-hand-space[data-multi] .hand-fan { padding-inline: 3px; }
+.bj-hand-space[data-multi] .hand-slot + .hand-slot { margin-left: calc(var(--bj-cw) * (var(--fan) - 1)); }
+@media (max-width: 599px) {
+  .bj-player:not([data-count="1"]):not([data-count="2"]) { gap: 4px; margin-inline: calc(var(--felt-pad) * -.7); width: auto; }
+}
 
 /* A doubled hand: the last card lies on its side, face down until the showdown. */
 .bj-hand-space[data-doubled] .hand-slot:last-child {
@@ -107,7 +133,21 @@
 }
 .bj-pill[data-tone="bust"] { color: var(--bj-bad); }
 .bj-pill-quiet { background: rgba(7, 20, 14, .42); color: rgb(var(--felt-ink) / .95); font-weight: 500; }
+.bj-pill { max-width: 100%; }
 .bj-result b { font-weight: 600; }
+.bj-result-head { display: inline-flex; align-items: center; white-space: nowrap; }
+/* Narrow column (3 or 4 hands on a phone): the pill wraps to two lines, word then amount, never clipped */
+@container (max-width: 131px) {
+  .bj-pill-slot:has(.bj-result) { min-height: 40px; }
+  .bj-result {
+    flex-wrap: wrap; justify-content: center; row-gap: 3px; column-gap: 0;
+    height: auto; min-height: var(--pill-h); padding: 5px 7px; border-radius: 14px;
+    font-size: 12px; white-space: normal; text-align: center;
+  }
+  .bj-result-amt { flex-basis: 100%; }
+  .bj-result .bj-result-val { padding-right: 0; }
+  .bj-result .bj-result-val::after { padding-inline: 4px 4px; }
+}
 .bj-result[data-tone="good"] .bj-result-amt { color: var(--bj-good); }
 .bj-result[data-tone="bad"] .bj-result-amt { color: var(--bj-bad); }
 .bj-result[data-tone="neutral"] .bj-result-word { color: rgb(var(--felt-ink) / .95); }
@@ -214,3 +254,24 @@
   .bj-dock[data-mode="play"], .bj-dock[data-mode="insurance"], .bj-dock[data-mode="result"] { padding-block: 10px; }
 }
 .bj-deal .bj-key { background: color-mix(in srgb, var(--on-accent) 18%, transparent); color: var(--on-accent); }
+
+/* Short viewports (laptops): scale the table down so felt + dock fit without scrolling a hand. */
+@media (max-height: 800px) {
+  .bj-table { --bj-scale: .92; --ring: 58px; gap: 10px; }
+  .bj-felt { --rail: 12px; }
+  .bj-felt .felt-content { padding-top: 8px; padding-bottom: calc(var(--felt-pad) * .7); }
+  .bj-stage { gap: 2px; }
+  .bj-print-block { min-height: 40px; }
+  .bj-hand-space { min-height: calc(var(--bj-cw) * 1.4 + 8px); }
+  .bj-table[data-mode="betting"] .bj-hand-space { min-height: calc(var(--bj-cw) * .7); }
+  .bj-table[data-size="md"] .bj-shoe-svg, .bj-table[data-size="lg"] .bj-shoe-svg { width: 74px; }
+  .bj-dock { padding-block: 8px; }
+}
+@media (max-height: 740px) {
+  .bj-table { --bj-scale: .84; --ring: 54px; }
+}
+@media (max-height: 680px) {
+  .bj-table { --bj-scale: .72; --ring: 50px; }
+  .bj-print-block { min-height: 34px; }
+  .bj-print-sub:last-of-type { display: none; }
+}

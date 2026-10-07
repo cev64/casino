@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { RULES } from '../../lib/blackjack';
 
 /**
  * Dealing shoe, seen from above-front, resting at the dealer's left (top right of the felt).
@@ -6,12 +7,13 @@ import { memo } from 'react';
  * penetration read-out beside it is the only text.
  */
 export const Shoe = memo(({ penetration = 0 }) => {
-  const pct = Math.round(Math.max(0, Math.min(1, penetration)) * 100);
-  // Remaining cards show as a stack that thins as the shoe is dealt
+  // Remaining cards show as a stack that thins as the shoe is dealt, and as a percentage
   const remaining = 1 - Math.max(0, Math.min(1, penetration));
+  const pct = Math.round(remaining * 100);
+  const cardsLeft = Math.round(remaining * RULES.shoeCards);
   const stackH = 6 + remaining * 15;
   return (
-    <div className="bj-shoe" title={`Shoe ${pct}% dealt. The cut card sits at 75%.`}>
+    <div className="bj-shoe" title={`${cardsLeft} cards left. The cut card sits at 25%.`}>
       <svg viewBox="0 0 96 64" className="bj-shoe-svg" aria-hidden="true" focusable="false">
         <defs>
           <linearGradient id="shoeBody" x1="0" y1="0" x2="0" y2="1">
@@ -60,7 +62,7 @@ export const Shoe = memo(({ penetration = 0 }) => {
         <path d="M8 50 L22 47.6 L22 56 L10 56 Q8 56 8 54 Z" fill="#1d2025" />
         <path d="M8 50 L22 47.6" stroke="#fff" strokeOpacity=".3" strokeWidth=".8" fill="none" />
       </svg>
-      <span className="felt-print bj-print bj-shoe-read tnum">Shoe {pct}%</span>
+      <span className="felt-print bj-print bj-shoe-read tnum" aria-label={`${cardsLeft} cards left in the shoe`}>Shoe {pct}%</span>
     </div>
   );
 });

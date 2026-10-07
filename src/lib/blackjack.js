@@ -544,6 +544,7 @@ export class BlackjackSession {
     this.deferSettle = deferSettle;
     this.pending = null; // finished but not yet paid out
     this.open = false; // a round has been dealt and not yet finished
+    this.staked = 0; // money withdrawn for the open round (bet, doubles, splits, insurance)
     this.lastRecord = null;
   }
 
@@ -556,7 +557,25 @@ export class BlackjackSession {
     if (amount <= 0) return { ok: true };
     if (this.wallet.balance() < amount) return { ok: false, error: 'Not enough balance' };
     const r = this.wallet.withdraw(amount);
-    return r && r.success === false ? { ok: false, error: 'Not enough balance' } : { ok: true };
+    if (r && r.success === false) return { ok: false, error: 'Not enough balance' };
+    this.staked = round2(this.staked + amount);
+    return { ok: true };
+  }
+
+  /**
+   * The page is going away (reload, tab close, unmount). A finished round is paid out and recorded
+   * at once; a hand still in play can't be resumed, so every stake taken for it is returned and
+   * nothing is written to history.
+   */
+  abandon() {
+    if (this.pending) return { settled: this.settle(), refunded: 0 };
+    if (!this.open) return { settled: null, refunded: 0 };
+    const refunded = this.staked;
+    this.open = false;
+    this.staked = 0;
+    if (refunded > 0) this.wallet.deposit(refunded);
+    this.history?.cancel?.();
+    return { settled: null, refunded };
   }
 
   async finishIfDone(state) {
@@ -576,6 +595,7 @@ export class BlackjackSession {
     if (!staked.ok) return staked;
 
     this.open = true;
+    this.staked = round2(betAmount);
     this.history?.begin?.({ bet: betAmount });
     const state = await this.engine.startHand(betAmount);
     await this.finishIfDone(state);

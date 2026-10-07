@@ -75,6 +75,7 @@ export const BlackjackTable = ({ active = true }) => {
   const [flights, setFlights] = useState([]);
   const [pres, setPres] = useState(INITIAL_PRES);
   const [dealerEvent, setDealerEvent] = useState(null);
+  const [chatKey, setChatKey] = useState(0); // remounting the dealer bubble drops whatever it is still saying
   const [penetration, setPenetration] = useState(0);
   const [enterFromRack, setEnterFromRack] = useState(false);
 
@@ -106,6 +107,12 @@ export const BlackjackTable = ({ active = true }) => {
   }, []);
 
   useEffect(() => clearTimers, [clearTimers]);
+
+  /** Drop the dealer's current line (e.g. "Insurance offered." once it no longer applies). */
+  const clearChat = useCallback(() => {
+    setDealerEvent(null);
+    setChatKey((k) => k + 1);
+  }, []);
 
   const play = useCallback((name) => {
     if (activeRef.current) sounds[name]?.();
@@ -229,6 +236,7 @@ export const BlackjackTable = ({ active = true }) => {
       at: t,
       fn: () => {
         patch({ resultShown: true, dealerCount: dealerCards, dealerPill: dealerCards, holeUp: true, doublesUp: true });
+        clearChat();
         settle();
         const net = r.net;
         const big = net >= 100 && net >= r.bet;
@@ -245,7 +253,7 @@ export const BlackjackTable = ({ active = true }) => {
     timeline.current.forEach((s) => {
       later(s.at, () => { if (!s.done) { s.done = true; s.fn(); } });
     });
-  }, [later, patch, play, settle]);
+  }, [later, patch, play, settle, clearChat]);
 
   /** Tap the felt to jump to the result. */
   const skip = useCallback(() => {
@@ -283,7 +291,6 @@ export const BlackjackTable = ({ active = true }) => {
     setDealerEvent('deal');
     [100, 250, 400, 550].forEach((ms) => later(ms, () => play('cardDeal')));
     if (res.state.reshuffled) {
-      toast('Shuffling');
       sounds.shuffle?.();
       setDealerEvent('shuffle');
     }
@@ -335,9 +342,9 @@ export const BlackjackTable = ({ active = true }) => {
       return;
     }
     if (take && !gs.evenMoneyOffered) later(0, () => sounds.chipPlace?.());
-    if (!take || gs.evenMoneyOffered) setDealerEvent(null);
+    clearChat();
     afterAction(res.state, 'insurance');
-  }, [gs, pres.landed, insurance, later, afterAction]);
+  }, [gs, pres.landed, insurance, later, afterAction, clearChat]);
 
   const newBet = useCallback(() => {
     clearTimers();
@@ -556,11 +563,16 @@ export const BlackjackTable = ({ active = true }) => {
             <p className="felt-print bj-print-main">{printLines[0]}</p>
             <p className="felt-print bj-print-sub">{printLines[1]}</p>
             <p className="felt-print bj-print-sub">Insurance pays 2 to 1</p>
-            <div className="bj-chat"><DealerChat game="blackjack" event={dealerEvent} /></div>
+            <div className="bj-chat"><DealerChat key={chatKey} game="blackjack" event={dealerEvent} /></div>
           </div>
 
           {/* Player */}
-          <section className="bj-player" aria-label="Your hands" data-count={Math.max(1, hands.length)}>
+          <section
+            className="bj-player"
+            aria-label="Your hands"
+            data-count={Math.max(1, hands.length)}
+            style={{ '--n': Math.max(2, ...hands.map((h) => h.cards.length + (h.flags.doubled ? 0.5 : 0))) }}
+          >
             {!inRound && placeholderHand}
             {inRound && hands.map((h, i) => {
               const pill = pillFor(h);
@@ -573,10 +585,10 @@ export const BlackjackTable = ({ active = true }) => {
               const len = h.cards.length;
               return (
                 <div key={`${round}-${i}`} className="bj-hand-col" data-active={isActive || undefined} data-multi={multi || undefined}>
-                  <span className="bj-hand-name t-micro" data-on={isActive || undefined} aria-hidden={multi ? undefined : 'true'}>
-                    {multi ? (isActive ? `Hand ${i + 1} · Playing` : `Hand ${i + 1}`) : ''}
+                  <span className="bj-hand-name t-micro" data-on={isActive || undefined} aria-hidden={multi ? undefined : 'true'} aria-label={multi ? `Hand ${i + 1}${isActive ? ', playing' : ''}` : undefined}>
+                    {multi ? <>Hand {i + 1}{isActive ? <span className="bj-hand-state"> · Playing</span> : null}</> : ''}
                   </span>
-                  <div className="bj-hand-space" data-doubled={h.flags.doubled && len >= 3 ? 'true' : undefined}>
+                  <div className="bj-hand-space" data-multi={multi || undefined} data-doubled={h.flags.doubled && len >= 3 ? 'true' : undefined}>
                     <Hand
                       cards={h.cards}
                       size={cardSize}
@@ -587,8 +599,10 @@ export const BlackjackTable = ({ active = true }) => {
                   <div className="bj-pill-slot">
                     {desc ? (
                       <Pill className="bj-result" tone={desc.tone} label={`${pill ? `${pill.aria}, ` : ''}${desc.word}${desc.showAmount ? ` ${money(desc.net, { signed: true })}` : ''}`}>
-                        {pill && pill.kind !== 'bust' && pill.kind !== 'blackjack' && <span className="bj-result-val">{pill.text}</span>}
-                        <span className="bj-result-word">{desc.word}</span>
+                        <span className="bj-result-head">
+                          {pill && pill.kind !== 'bust' && pill.kind !== 'blackjack' && <span className="bj-result-val">{pill.text}</span>}
+                          <span className="bj-result-word">{desc.word}</span>
+                        </span>
                         {desc.showAmount && <b className="bj-result-amt">{money(desc.net, { signed: true })}</b>}
                       </Pill>
                     ) : pill ? (
