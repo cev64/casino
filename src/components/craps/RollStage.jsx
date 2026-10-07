@@ -8,7 +8,7 @@ import { formatMoney } from '../ui/RollingNumber';
  * The shooter throws from the bottom right toward the back wall (the number boxes) and the
  * dice settle on the way back.
  */
-export const RollStage = memo(({ dice, rolling, summary }) => {
+export const RollStage = memo(({ dice, rolling, summary, onDiceSettled }) => {
   const status = summary?.status;
   return (
     <div className="cr-stage" data-rolling={rolling || undefined}>
@@ -50,7 +50,7 @@ export const RollStage = memo(({ dice, rolling, summary }) => {
           }}
           transition={{ duration: 1.0, times: [0, 0.42, 0.7, 0.86, 1], ease: 'easeOut' }}
         >
-          <DicePair die1={dice.die1} die2={dice.die2} isRolling={rolling} showTotal={false} />
+          <DicePair die1={dice.die1} die2={dice.die2} isRolling={rolling} showTotal={false} onSettled={onDiceSettled} />
         </motion.div>
       )}
     </div>
