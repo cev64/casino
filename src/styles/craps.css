@@ -266,11 +266,16 @@
 
 /* ---------- Dock ---------- */
 
+/* The dock sticks to the bottom only where the board is too tall to fit above it (phones, tablets,
+   very short windows). On laptop screens the board is compact enough that board + dock fit, so the
+   dock sits in the flow below the felt and never covers a spot. */
 .cr-dock-wrap {
   position: sticky; z-index: 25;
   bottom: calc(var(--nav-h) + 12px + var(--safe-bottom) + var(--cr-dock-gap));
+  container: crdock / inline-size;
 }
 @media (min-width: 600px) { .cr-dock-wrap { bottom: 16px; } }
+@media (min-width: 1024px) and (min-height: 680px) { .cr-dock-wrap { position: relative; bottom: auto; } }
 .cr-dock {
   display: flex; flex-direction: column; align-items: stretch; gap: 4px;
   padding: 8px 10px 10px; border-radius: 28px;
@@ -280,19 +285,33 @@
   margin-inline: auto; border-radius: 0;
 }
 .cr-dock .chip-rack-row { padding: 10px 4px 8px; justify-content: center; }
-.cr-actions { display: flex; align-items: center; gap: 8px; }
+.cr-actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .cr-actions .cr-act { flex: 1 1 0; min-width: 0; padding-inline: 8px; font-size: 14px; gap: 6px; }
 .cr-actions .cr-act span { overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 479px) { .cr-act svg { display: none; } }
 .cr-roll-btn { flex: 1.25 1 0; min-width: 96px; }
 
-@media (min-width: 900px) {
-  .cr-dock { flex-direction: row; align-items: center; justify-content: space-between; gap: 20px; padding: 6px 14px 6px 8px; }
-  .cr-dock .chip-rack.glass.cr-rack { margin-inline: 0; }
+/* Phones: a slimmer dock so less of the board sits underneath it */
+@media (max-width: 599px) {
+  .cr-dock { padding: 4px 8px 8px; gap: 0; }
+  .cr-dock .chip-rack-row { padding: 6px 4px 4px; }
+  .cr-dock .chip-rack-size { --chip-w: clamp(36px, calc((100vw - 32px - 78px) / 6), 48px); }
+}
+
+/* Row layout once the dock is wide enough for chips and actions side by side */
+@container crdock (min-width: 700px) {
+  .cr-dock { flex-direction: row; align-items: center; justify-content: space-between; gap: 16px; padding: 6px 12px 6px 8px; }
+  .cr-dock .chip-rack.glass.cr-rack { margin-inline: 0; flex: none; }
   .cr-dock .chip-rack-row { padding: 8px 4px 6px; }
-  .cr-actions { flex: none; }
-  .cr-actions .cr-act { flex: none; padding-inline: 16px; font-size: 15px; }
-  .cr-roll-btn { flex: none; min-width: 132px; }
+  .cr-actions { flex: 0 1 auto; }
+  .cr-actions .cr-act { flex: 0 1 auto; padding-inline: 12px; font-size: 15px; }
+  .cr-act svg { display: none; }
+  .cr-roll-btn { flex: none; min-width: 112px; }
+}
+@container crdock (min-width: 860px) {
+  .cr-actions .cr-act { padding-inline: 16px; }
+  .cr-act svg { display: block; }
+  .cr-roll-btn { min-width: 132px; }
 }
 
 .cr-hint-line { margin: 0; text-align: center; font-size: 13px; line-height: 18px; color: var(--ink-3); }
@@ -462,4 +481,154 @@
   .cr-big[data-has-bet] .cr-art { transform: translateY(-22px); }
   /* The come box also holds the dice and result: chips sit under the word COME */
   .cr-come .cr-chips { justify-content: flex-start; align-items: center; padding: 0 0 0 31.5%; }
+}
+
+/* ==========================================================================
+   Compact board for laptop-height screens (under 960px tall): rows are shorter so that the page
+   head, readout, felt and the in-flow dock fit one 768px viewport without the dock covering a spot.
+   ========================================================================== */
+@media (min-width: 600px) and (max-height: 959px) {
+  .cr-root { gap: 10px; }
+  .cr-readout { padding: 6px 20px; }
+  .cr-felt.felt { --rail: 12px; --felt-pad: 8px; --rt: 24px; --rbh: 24px; --rbv: 24px; }
+  .cr-num { grid-template-rows: 28px minmax(0, 1fr); }
+  .cr-numeral { font-size: 34px; }
+  .cr-numeral[data-word] { font-size: 24px; }
+  .cr-placebox .cr-art { padding-top: 4px; }
+  .cr-big[data-has-bet] .cr-big-text { font-size: 18px; }
+  .cr-big[data-has-bet] .cr-big-text small { font-size: 11px; }
+  .cr-lay .cr-tiny, .cr-lay-empty .cr-tiny { font-size: 9px; }
+}
+@container crapsfelt (min-width: 540px) {
+  @media (max-height: 959px) {
+    .cr-table { gap: 6px; }
+    .cr-num { min-height: 100px; }
+    .ga-come, .cr-stage { height: 64px; }
+    .cr-stage { --die: 42px; }
+    .ga-field { height: 56px; }
+    .ga-dp { height: 36px; }
+    .ga-pass { height: 44px; }
+    .cr-come-text { font-size: 30px; }
+    .cr-pass-text { font-size: 24px; }
+    .cr-field-note { display: none; }
+    .cr-dcb .cr-art { padding-top: 38px; gap: 3px; }
+    .cr-dcb .cr-bar-dice { height: 12px; }
+  }
+}
+/* mid width: ten props in two rows of five */
+@container crapsfelt (min-width: 640px) and (max-width: 859px) {
+  @media (max-height: 959px) {
+    .cr-props { grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: 52px 52px; gap: 6px; margin-top: 0; }
+    .pr-seven { grid-area: 1 / 1; } .pr-h4 { grid-area: 1 / 2; } .pr-h6 { grid-area: 1 / 3; }
+    .pr-h8 { grid-area: 1 / 4; } .pr-h10 { grid-area: 1 / 5; }
+    .pr-o2 { grid-area: 2 / 1; } .pr-o3 { grid-area: 2 / 2; } .pr-o11 { grid-area: 2 / 3; }
+    .pr-o12 { grid-area: 2 / 4; } .pr-craps { grid-area: 2 / 5; }
+    .cr-prop .cr-art { gap: 2px; }
+    .cr-prop-big { font-size: 14px; letter-spacing: .1em; text-indent: .1em; }
+    .cr-prop-name { font-size: 12px; letter-spacing: .08em; }
+    .cr-hard .cr-pay, .cr-horn .cr-pay { display: block; }
+    .cr-prop-dice { height: 12px; }
+  }
+}
+/* wide: the props box sits at the right and follows the (shorter) rows */
+@container crapsfelt (min-width: 860px) {
+  @media (max-height: 959px) {
+    .cr-table { gap: 6px; }
+    .cr-props { gap: 6px; }
+    .cr-num { min-height: 112px; }
+    .ga-come, .cr-stage { height: 72px; }
+    .cr-stage { --die: 46px; }
+    .ga-field { height: 62px; }
+    .ga-dp { height: 38px; }
+    .ga-pass { height: 48px; }
+    .cr-come-text { font-size: 34px; }
+    .cr-numeral { font-size: 38px; }
+    .cr-numeral[data-word] { font-size: 27px; }
+    .cr-big[data-has-bet] .cr-art { transform: translateY(-16px); }
+    .cr-prop-big { font-size: 18px; }
+    .cr-prop-name { font-size: 12px; }
+    .cr-prop-dice { height: 12px; }
+    .cr-prop .cr-art { gap: 2px; }
+  }
+}
+/* the dock row is slimmer on laptop screens too */
+@media (min-width: 600px) and (max-height: 959px) {
+  .cr-dock .chip-rack-size { --chip-w: 44px; }
+  .cr-dock { padding-block: 4px; }
+}
+
+/* ==========================================================================
+   Chips never sit on top of print that matters (QA pass).
+   Prop boxes: name on top, stack underneath. Number boxes: numeral at the top, stack below it.
+   ========================================================================== */
+.cr-hard[data-has-bet] .cr-hit, .cr-horn[data-has-bet] .cr-hit { align-items: flex-start; padding-top: 5px; }
+.cr-hard[data-has-bet] .cr-art, .cr-horn[data-has-bet] .cr-art { opacity: 1; padding-bottom: 0; }
+.cr-hard[data-has-bet] .cr-prop-dice, .cr-horn[data-has-bet] .cr-prop-dice,
+.cr-hard[data-has-bet] .cr-pay, .cr-horn[data-has-bet] .cr-pay { display: none; }
+.cr-hard[data-has-bet] .cr-chips, .cr-horn[data-has-bet] .cr-chips { align-items: flex-end; justify-content: center; padding: 0 0 3px; }
+
+.cr-placebox[data-has-bet] .cr-hit { align-items: flex-start; padding-top: 6px; }
+.cr-placebox[data-has-bet] .cr-art { padding-top: 0; }
+
+/* Odds boxes: with a bet the name shrinks to the top edge and the stack sits below it */
+.cr-odds[data-has-bet] .cr-hit { align-items: flex-start; padding-top: 5px; }
+.cr-odds[data-has-bet] .cr-art { opacity: 1; }
+.cr-odds[data-has-bet] .cr-odds-text { font-size: 11px; letter-spacing: .16em; text-indent: .16em; line-height: 1.1; }
+.cr-odds[data-has-bet] .cr-odds-text br { display: none; }
+.cr-odds[data-has-bet] .cr-chips { align-items: flex-end; justify-content: center; padding: 0 0 3px; }
+
+/* The puck rides at the right end of the Lay strip, clear of the word "Lay" and of the numeral */
+.cr-num { --lay-h: 40px; }
+.cr-puck-num { --pk-n: 24px; top: calc((var(--lay-h) - var(--pk-n)) / 2); right: 3px; }
+.cr-puck-num .puck-sm { --pk: var(--pk-n); }
+.cr-puck-num .puck-word { font-size: 8px; }
+@container crapsfelt (min-width: 860px) { .cr-puck-num { --pk-n: 28px; } .cr-puck-num .puck-word { font-size: 9px; } }
+@media (min-width: 600px) and (max-height: 959px) { .cr-num { --lay-h: 28px; } }
+
+/* "Lay" on a number: a quiet label until a don't come bet is there to add odds to */
+.cr-lay-empty { cursor: default; }
+.cr-lay-empty .cr-tiny { opacity: .32; }
+
+@container crapsfelt (max-width: 539px) {
+  /* PASS LINE with a bet: smaller print so the stack and lock clear the letters */
+  .cr-pass[data-has-bet] .cr-pass-text { font-size: 17px; letter-spacing: .16em; text-indent: 0; }
+  .cr-pass[data-has-bet] .cr-art { padding-left: 12px; }
+}
+
+.cr-pass .cr-chips { padding-right: 26px; }
+/* Narrow Big 6 / Big 8 boxes (seven and wide layouts): name on top, stack under it */
+@container crapsfelt (min-width: 540px) {
+  .cr-big[data-has-bet] .cr-hit { align-items: flex-start; padding-top: 4px; }
+  .cr-big[data-has-bet] .cr-art { transform: none; }
+  .cr-big[data-has-bet] .cr-big-text { font-size: 22px; }
+  .cr-big[data-has-bet] .cr-big-text small { font-size: 12px; }
+  .cr-big .cr-chips, .cr-big[data-has-bet] .cr-chips { justify-content: center; align-items: flex-end; padding: 0 0 3px; }
+}
+
+/* Seven-column layout on a narrow felt: the come stack must clear the result pill and dice */
+@container crapsfelt (min-width: 540px) and (max-width: 699px) {
+  .cr-stage { --die: 46px; padding-right: 10px; }
+  .cr-come-text { font-size: 28px; }
+  .cr-come .cr-hit { padding-left: 22px; }
+  .cr-come .cr-chips { padding-left: 29%; }
+  .cr-result { padding: 6px 12px; }
+  .cr-result-title { font-size: 15px; }
+  .cr-result-net { font-size: 13px; }
+}
+@media (min-width: 600px) and (max-height: 959px) {
+  @container crapsfelt (min-width: 540px) {
+    .cr-big[data-has-bet] .cr-big-text { font-size: 18px; }
+    .cr-big[data-has-bet] .cr-big-text small { font-size: 11px; }
+  }
+}
+
+/* A come bet that travelled to this number takes the right half of the box: the numeral steps left */
+.cr-num:has(.cr-comebox) .cr-placebox .cr-hit { justify-content: flex-start; padding-left: 10px; }
+.cr-num:has(.cr-comebox) .cr-placebox .cr-numeral[data-word] { font-size: 18px; letter-spacing: .04em; }
+
+@container crapsfelt (min-width: 540px) {
+  .cr-dcb .cr-art { padding-top: 40px; }
+}
+@media (min-width: 600px) and (max-height: 959px) {
+  @container crapsfelt (min-width: 540px) { .cr-dcb .cr-art { padding-top: 38px; } }
 }

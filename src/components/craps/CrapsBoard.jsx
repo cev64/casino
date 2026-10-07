@@ -215,7 +215,7 @@ export const CrapsBoard = memo(({
                 stackSize="xs"
                 {...common}
               >
-                <span className="cr-print cr-odds-text">Lay<br />odds</span>
+                <span className="cr-print cr-odds-text">Lay{' '}<br />odds</span>
               </BetSpot>
             </motion.div>
           )}

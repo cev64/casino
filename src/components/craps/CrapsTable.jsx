@@ -33,6 +33,15 @@ const isTyping = (el) => {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
 };
 
+/** The same message is never toasted twice in a row (rapid taps, or two handlers reporting one refusal). */
+let lastNote = { message: '', at: 0 };
+const notify = (message, opts) => {
+  const now = Date.now();
+  if (message === lastNote.message && now - lastNote.at < 1800) return;
+  lastNote = { message, at: now };
+  toast(message, opts);
+};
+
 /** Which spot shows the result of an outcome. */
 const outcomeSpot = (bet) => {
   let m = /^comeOdds(\d+)$/.exec(bet) || /^come(\d+)$/.exec(bet);
@@ -77,6 +86,8 @@ export const CrapsTable = ({ active = true }) => {
   const [celebrate, setCelebrate] = useState({ show: false, payout: 0 });
   const [hintSeen, setHintSeen] = useState(readHint);
 
+  const rootRef = useRef(null);
+  const dockRef = useRef(null);
   const alive = useRef(true);
   const busyRef = useRef(false);
   const clearMarksTimer = useRef(0);
@@ -111,7 +122,7 @@ export const CrapsTable = ({ active = true }) => {
       if (!hintSeen) { writeHint(); setHintSeen(true); }
     } else {
       sounds.error?.();
-      toast(r.error, { tone: 'bad' });
+      notify(r.error, { tone: 'bad' });
     }
   }, [placeSpot, chip, hintSeen, dismissMarks]);
 
@@ -167,18 +178,36 @@ export const CrapsTable = ({ active = true }) => {
       haptic(10);
       if (r.skipped) toast(`${r.placed} placed, ${r.skipped} not available now`, { tone: 'warn' });
     } else {
-      toast(r.error, { tone: 'bad' });
+      notify(r.error, { tone: 'bad' });
     }
   }, [rebet, dismissMarks]);
 
   /* ---------------- rolling ---------------- */
+
+  // Rolling from the dock while the dice stage is scrolled out of view (or under the dock):
+  // bring the stage into the open band between the top bar and the dock, so the toss and the
+  // result are seen. Smooth, or instant with reduced motion.
+  const revealStage = useCallback(() => {
+    const stageEl = rootRef.current?.querySelector('.cr-stage');
+    if (!stageEl) return;
+    const r = stageEl.getBoundingClientRect();
+    const top = (document.querySelector('.topbar')?.getBoundingClientRect().bottom ?? 0) + 8;
+    const dockTop = dockRef.current?.getBoundingClientRect().top ?? window.innerHeight;
+    const limit = Math.min(window.innerHeight, dockTop) - 8;
+    if (limit - top < r.height + 120) return; // no room to place it anyway
+    if (r.top >= top && r.bottom <= limit - 110) return; // already comfortably in view (the toss starts below it)
+    const delta = r.top + r.height / 2 - (top + limit - 40) / 2;
+    const behavior = prefersReduced() ? 'auto' : 'smooth';
+    // after this render commits, so the browser does not drop the smooth scroll
+    requestAnimationFrame(() => window.scrollBy({ top: delta, behavior }));
+  }, []);
 
   const handleRoll = useCallback(async () => {
     if (busyRef.current) return;
     const blocked = rollBlockedReason();
     if (blocked) {
       sounds.error?.();
-      toast(blocked, { tone: 'bad' });
+      notify(blocked, { tone: 'bad' });
       return;
     }
     const t = prefersReduced() ? REDUCED : { SHAKE_MS, TOSS_MS, LAND_SOUND_MS, SETTLE_MS, RESOLVE_MS };
@@ -187,6 +216,7 @@ export const CrapsTable = ({ active = true }) => {
     setBusy(true);
     dismissMarks();
     setSummary(null);
+    revealStage();
     sounds.diceShake?.();
     haptic([14, 26, 14]);
 
@@ -249,12 +279,11 @@ export const CrapsTable = ({ active = true }) => {
     setTravel(null);
     busyRef.current = false;
     setBusy(false);
-  }, [roll, rollBlockedReason, commitRoll, dismissMarks]);
+  }, [roll, rollBlockedReason, commitRoll, dismissMarks, revealStage]);
 
   /* ---------------- keyboard ---------------- */
 
   // Toasts rise above the sticky dock while this table is on screen
-  const dockRef = useRef(null);
   useEffect(() => {
     const el = dockRef.current;
     const root = document.documentElement;
@@ -313,7 +342,7 @@ export const CrapsTable = ({ active = true }) => {
   const state = gameState;
 
   return (
-    <div className="cr-root" data-active={active || undefined}>
+    <div className="cr-root" ref={rootRef} data-active={active || undefined}>
       <WinCelebration show={celebrate.show} payout={celebrate.payout} />
 
       <div className="cr-readout glass">
@@ -329,7 +358,7 @@ export const CrapsTable = ({ active = true }) => {
           <span className="t-micro">Limits</span>
           <span className="t-card-title tnum">{formatMoney(5)}{'–'}{formatMoney(500)}</span>
         </div>
-        <RollHistory rolls={rolls} />
+        <RollHistory rolls={rolls} hint={!hintSeen} />
       </div>
 
       <Felt variant="craps" className="cr-felt" contentClassName="cr-felt-content">
@@ -349,9 +378,6 @@ export const CrapsTable = ({ active = true }) => {
       <p id="cr-spot-help" className="sr-only">
         Press Enter to place the selected chip. Press Delete, right-click, or press and hold to take the bet down.
       </p>
-      {!hintSeen && (
-        <p className="cr-hint-line">Tap a spot to bet. Press and hold, or right-click, to take a bet down.</p>
-      )}
 
       <div className="cr-dock-wrap" ref={dockRef}>
         <ControlDock

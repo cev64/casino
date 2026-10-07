@@ -10,12 +10,12 @@ const TAG = {
 const MAX = 12;
 
 /** The last rolls, newest first. Seven outs and point hits carry a word, not just a colour. */
-export const RollHistory = memo(({ rolls }) => {
+export const RollHistory = memo(({ rolls, hint = false }) => {
   const recent = rolls.slice(-MAX).reverse();
   return (
     <div className="cr-history" role="group" aria-label="Recent rolls">
       {recent.length === 0 ? (
-        <span className="cr-history-empty">No rolls yet</span>
+        <span className="cr-history-empty">{hint ? 'Tap a spot to bet. Hold to take it down.' : 'No rolls yet'}</span>
       ) : (
         <ol className="cr-history-list">
           <AnimatePresence initial={false}>
