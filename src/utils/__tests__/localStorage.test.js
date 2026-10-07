@@ -116,14 +116,14 @@ describe('localStorage utilities', () => {
       const settings = getSettings();
       expect(settings.soundEnabled).toBe(true);
       expect(settings.animationSpeed).toBe('normal');
-      expect(settings.theme).toBe('dark');
+      expect(settings.theme).toBe('system');
     });
 
     it('should update individual settings', () => {
       updateSettings({ soundEnabled: false });
       const settings = getSettings();
       expect(settings.soundEnabled).toBe(false);
-      expect(settings.theme).toBe('dark'); // Other settings unchanged
+      expect(settings.theme).toBe('system'); // Other settings unchanged
     });
   });
 

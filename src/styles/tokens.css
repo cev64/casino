@@ -1,0 +1,306 @@
+/*
+ * Fluid Glass design tokens.
+ * Values follow FLUID_GLASS_DESIGN_GUIDE.md exactly. Light is the default; dark applies
+ * with the OS preference (unless the user forced light) or when data-theme="dark".
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Colour */
+  --ink: #08204F;
+  --ink-2: #415373;
+  --ink-3: #63718A;
+  --page: #F4F6FB;
+  --card: #FFFFFF;
+  --accent: #1059FC;
+  --accent-pressed: #0A45CC;
+  --on-accent: #FFFFFF;
+  --good: #15803D;
+  --bad: #DC2626;
+  --warn: #B45309;
+  --scrim: rgba(8, 32, 79, .28);
+
+  /* Glass */
+  --glass: rgba(255, 255, 255, .74);
+  --glass-strong: rgba(255, 255, 255, .86);
+  --glass-hi: inset 0 1px 0 rgba(255, 255, 255, .55);
+  --glass-edge: 0 0 0 1px rgba(8, 32, 79, .06);
+  --glass-shadow: 0 1px 2px rgba(8, 32, 79, .04), 0 12px 32px -12px rgba(8, 32, 79, .14);
+  --glass-shadow-lg: 0 24px 64px -16px rgba(8, 32, 79, .28);
+  --fill: rgba(8, 32, 79, .05);
+  --fill-2: rgba(8, 32, 79, .08);
+  --thumb: #FFFFFF;
+  --thumb-shadow: 0 1px 2px rgba(8, 32, 79, .08), 0 4px 12px -2px rgba(8, 32, 79, .12);
+  --fab-shadow: 0 10px 24px -6px rgba(16, 89, 252, .45);
+  --blur: blur(24px) saturate(160%);
+
+  /* Ambient backdrop blobs */
+  --blob-a: rgba(16, 89, 252, .07);
+  --blob-b: rgba(99, 102, 241, .05);
+  --blob-c: rgba(56, 189, 248, .04);
+
+  /* Motion */
+  --ease: cubic-bezier(.22, 1, .36, 1);
+  --spring: cubic-bezier(.34, 1.4, .64, 1);
+  --spring-soft: cubic-bezier(.3, 1.25, .5, 1);
+
+  /* Radii */
+  --r-card: 20px;
+  --r-sheet: 28px;
+  --r-menu: 18px;
+  --r-control: 12px;
+  --r-rail: 24px;
+
+  /* Layout */
+  --topbar-h: 52px;
+  --nav-h: 60px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #F5F8FF;
+  --ink-2: #C2CEE2;
+  --ink-3: #91A2BF;
+  --page: #0A1122;
+  --card: #0A1122;
+  --accent: #4A82FF;
+  --accent-pressed: #7BA3FF;
+  --on-accent: #0A1122;
+  --good: #4ADE80;
+  --bad: #FF8585;
+  --warn: #F2A93B;
+  --scrim: rgba(0, 0, 0, .5);
+  --glass: rgba(20, 32, 56, .72);
+  --glass-strong: rgba(17, 27, 48, .88);
+  --glass-hi: inset 0 1px 0 rgba(255, 255, 255, .08);
+  --glass-edge: 0 0 0 1px rgba(255, 255, 255, .06);
+  --glass-shadow: 0 1px 2px rgba(0, 0, 0, .25), 0 16px 40px -14px rgba(0, 0, 0, .6);
+  --glass-shadow-lg: 0 24px 64px -16px rgba(0, 0, 0, .7);
+  --fill: rgba(255, 255, 255, .06);
+  --fill-2: rgba(255, 255, 255, .10);
+  --thumb: rgba(255, 255, 255, .14);
+  --thumb-shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 12px -2px rgba(0, 0, 0, .4);
+  --fab-shadow: 0 10px 24px -6px rgba(0, 0, 0, .55);
+  --blob-a: rgba(74, 130, 255, .12);
+  --blob-b: rgba(99, 102, 241, .08);
+  --blob-c: rgba(56, 189, 248, .05);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ink: #F5F8FF;
+    --ink-2: #C2CEE2;
+    --ink-3: #91A2BF;
+    --page: #0A1122;
+    --card: #0A1122;
+    --accent: #4A82FF;
+    --accent-pressed: #7BA3FF;
+    --on-accent: #0A1122;
+    --good: #4ADE80;
+    --bad: #FF8585;
+    --warn: #F2A93B;
+    --scrim: rgba(0, 0, 0, .5);
+    --glass: rgba(20, 32, 56, .72);
+    --glass-strong: rgba(17, 27, 48, .88);
+    --glass-hi: inset 0 1px 0 rgba(255, 255, 255, .08);
+    --glass-edge: 0 0 0 1px rgba(255, 255, 255, .06);
+    --glass-shadow: 0 1px 2px rgba(0, 0, 0, .25), 0 16px 40px -14px rgba(0, 0, 0, .6);
+    --glass-shadow-lg: 0 24px 64px -16px rgba(0, 0, 0, .7);
+    --fill: rgba(255, 255, 255, .06);
+    --fill-2: rgba(255, 255, 255, .10);
+    --thumb: rgba(255, 255, 255, .14);
+    --thumb-shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 12px -2px rgba(0, 0, 0, .4);
+    --fab-shadow: 0 10px 24px -6px rgba(0, 0, 0, .55);
+    --blob-a: rgba(74, 130, 255, .12);
+    --blob-b: rgba(99, 102, 241, .08);
+    --blob-c: rgba(56, 189, 248, .05);
+  }
+}
+
+/* ---------- Base ---------- */
+
+html {
+  background: var(--page);
+  color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: transparent;
+  color: var(--ink);
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::selection { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+
+.tnum { font-feature-settings: "tnum" 1, "lnum" 1; font-variant-numeric: tabular-nums lining-nums; }
+
+/* ---------- Type scale ---------- */
+
+.t-display {
+  font-family: 'Barlow Condensed', 'Inter', sans-serif;
+  font-weight: 600; font-size: 40px; line-height: 44px;
+  letter-spacing: .8px; text-transform: uppercase; color: var(--ink);
+}
+.t-hero { font-size: 48px; line-height: 52px; font-weight: 600; letter-spacing: -1px; font-feature-settings: "tnum" 1, "lnum" 1; }
+.t-title { font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -.48px; }
+.t-card-title { font-size: 17px; line-height: 24px; font-weight: 600; letter-spacing: -.2px; }
+.t-body { font-size: 16px; line-height: 24px; font-weight: 400; }
+.t-micro {
+  font-size: 12px; line-height: 16px; font-weight: 600;
+  letter-spacing: .72px; text-transform: uppercase; color: var(--ink-3);
+}
+
+/* ---------- Glass recipes ---------- */
+
+.glass, .glass-strong {
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  box-shadow: var(--glass-hi), var(--glass-edge), var(--glass-shadow);
+}
+.glass { background: var(--glass); border-radius: var(--r-card); }
+.glass-strong { background: var(--glass-strong); box-shadow: var(--glass-hi), var(--glass-edge), var(--glass-shadow-lg); }
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass, .glass-strong { background: var(--card); }
+}
+
+/* Tappable glass card: lift on hover */
+.glass-tap {
+  transition: transform .2s var(--ease), box-shadow .2s var(--ease);
+}
+@media (hover: hover) {
+  .glass-tap:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--glass-hi), var(--glass-edge), var(--glass-shadow-lg);
+  }
+}
+
+/* Press feedback */
+.pressable { transition: transform .15s var(--ease), background-color .2s var(--ease), color .2s var(--ease), opacity .2s var(--ease); }
+.pressable:active:not(:disabled) { transform: scale(.97); }
+.pressable-icon:active:not(:disabled) { transform: scale(.94); }
+
+/* ---------- Ambient backdrop ---------- */
+
+.backdrop {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden;
+  background: var(--page);
+}
+.backdrop i {
+  position: absolute; display: block; border-radius: 50%;
+  filter: blur(40px);
+  will-change: transform;
+  animation: blob-drift 36s var(--ease) infinite alternate;
+}
+.backdrop i:nth-child(1) {
+  width: 70vmax; height: 70vmax; left: -20vmax; top: -25vmax;
+  background: radial-gradient(circle, var(--blob-a), transparent 70%);
+}
+.backdrop i:nth-child(2) {
+  width: 60vmax; height: 60vmax; right: -18vmax; bottom: -22vmax;
+  background: radial-gradient(circle, var(--blob-b), transparent 70%);
+  animation-duration: 44s; animation-direction: alternate-reverse;
+}
+.backdrop i:nth-child(3) {
+  width: 50vmax; height: 50vmax; left: 25vw; bottom: -10vmax;
+  background: radial-gradient(circle, var(--blob-c), transparent 70%);
+  animation-duration: 52s;
+}
+@keyframes blob-drift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(6vmax, 4vmax, 0) scale(1.1); }
+}
+/* Freeze drift while any sheet, dialog or menu is open */
+.modal-lock .backdrop i { animation-play-state: paused; }
+
+/* ---------- Top bar: progressive fade, never a panel ---------- */
+
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  height: calc(var(--topbar-h) + var(--safe-top));
+  padding-top: var(--safe-top);
+  isolation: isolate;
+}
+.topbar::before {
+  content: ''; position: absolute; inset: 0 0 -28px; z-index: -1; pointer-events: none;
+  opacity: 0; transition: opacity .25s var(--ease);
+  background: linear-gradient(to bottom,
+    color-mix(in srgb, var(--page) 92%, transparent) 0%,
+    color-mix(in srgb, var(--page) 84%, transparent) calc(100% - 28px),
+    transparent 100%);
+  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+          mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+}
+.topbar.condensed::before { opacity: 1; }
+.topbar .compact-title { opacity: 0; transform: translateY(4px); transition: opacity .22s var(--ease), transform .22s var(--ease); }
+.topbar.condensed .compact-title { opacity: 1; transform: none; }
+
+/* ---------- Modal / sheet: the container never fades ---------- */
+
+.modal {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  pointer-events: none;
+}
+.modal.open { pointer-events: auto; }
+.modal::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; opacity: 0;
+  background: var(--scrim);
+  -webkit-backdrop-filter: blur(6px) saturate(1.2); backdrop-filter: blur(6px) saturate(1.2);
+  transition: opacity .22s var(--ease);
+}
+.modal.open::before { opacity: var(--scrim-opacity, 1); transition-duration: .28s; }
+.modal .sheet {
+  position: relative;
+  width: 100%; max-width: 560px; max-height: min(86dvh, 820px);
+  display: flex; flex-direction: column;
+  border-radius: var(--r-sheet);
+  opacity: 0; transform: translateY(16px) scale(.96);
+  transition: transform .22s var(--ease), opacity .2s var(--ease);
+}
+.modal.open .sheet {
+  opacity: 1; transform: none;
+  transition: transform .35s var(--spring), opacity .25s var(--ease);
+}
+.modal .sheet.dragging { transition: none !important; }
+
+@media (max-width: 599px) {
+  .modal { align-items: flex-end; padding: 0; }
+  .modal .sheet {
+    max-width: none; max-height: 92dvh;
+    border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+    transform: translateY(100%);
+    padding-bottom: var(--safe-bottom);
+  }
+}
+
+/* ---------- Reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .backdrop i { animation: none !important; }
+}

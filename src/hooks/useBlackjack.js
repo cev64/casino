@@ -1,136 +1,138 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { BlackjackEngine } from '../lib/blackjack';
+import { BlackjackSession } from '../lib/blackjack';
 import { useWalletStore } from '../stores/walletStore';
 import { useGameStore } from '../stores/gameStore';
 
+// Safety net: if the table never calls settle() (unmounted, interrupted), pay out anyway.
+const SETTLE_FALLBACK_MS = 12000;
+
+const copyCard = (c) => ({ ...c });
+
+/** Plain copy of the engine state so React never sees the engine's mutable arrays. */
+const snapshot = (s, round) => ({
+  ...s,
+  round,
+  dealerHand: s.dealerHand.map(copyCard),
+  playerHands: s.playerHands.map((h) => h.map(copyCard)),
+  handBets: [...s.handBets],
+  handFlags: s.handFlags.map((f) => ({ ...f })),
+  result: s.result ? { ...s.result, handResults: s.result.handResults.map((r) => ({ ...r })) } : null,
+});
+
+/**
+ * Blackjack round controller: one `BlackjackSession` (engine + wallet + history).
+ * Every action resolves to `{ ok, error?, state? }`. Payouts are deferred until `settle()` so the
+ * balance never changes before the hole card is turned over.
+ */
 export const useBlackjack = () => {
-  const [engine] = useState(() => new BlackjackEngine());
   const [gameState, setGameState] = useState(null);
   const [isInitialized, setIsInitialized] = useState(false);
-  const { balance, withdraw, deposit } = useWalletStore();
-  const { setCurrentGame, endGame } = useGameStore();
+  const balance = useWalletStore((s) => s.balance);
+  const roundRef = useRef(0);
+  const lockRef = useRef(false);
+  const fallbackRef = useRef(0);
 
-  // Fix 1.3: use refs for deposit/endGame to avoid stale closure issues
-  const depositRef = useRef(deposit);
-  const endGameRef = useRef(endGame);
-  depositRef.current = deposit;
-  endGameRef.current = endGame;
+  const sessionRef = useRef(null);
+  if (!sessionRef.current) {
+    sessionRef.current = new BlackjackSession({
+      deferSettle: true,
+      wallet: {
+        balance: () => useWalletStore.getState().balance,
+        withdraw: (n) => useWalletStore.getState().withdraw(n),
+        deposit: (n) => useWalletStore.getState().deposit(n),
+      },
+      history: {
+        begin: ({ bet }) => useGameStore.getState().setCurrentGame({
+          type: 'blackjack',
+          bet,
+          startedAt: new Date().toISOString(),
+        }),
+        end: (record) => useGameStore.getState().endGame(record),
+        cancel: () => useGameStore.getState().setCurrentGame(null),
+      },
+    });
+  }
+  const session = sessionRef.current;
 
   useEffect(() => {
-    const init = async () => {
-      await engine.initialize();
-      setIsInitialized(true);
+    let alive = true;
+    session.initialize().then(() => {
+      if (alive) setIsInitialized(true);
+    });
+    return () => { alive = false; };
+  }, [session]);
+
+  const publish = useCallback((res) => {
+    if (res.ok && res.state) {
+      setGameState(snapshot(res.state, roundRef.current));
+      if (res.state.gameState === 'finished') {
+        clearTimeout(fallbackRef.current);
+        fallbackRef.current = setTimeout(() => session.settle(), SETTLE_FALLBACK_MS);
+      }
+    }
+    return res;
+  }, [session]);
+
+  const run = useCallback(async (fn) => {
+    if (lockRef.current) return { ok: false, error: 'Busy' };
+    lockRef.current = true;
+    try {
+      return publish(await fn());
+    } finally {
+      lockRef.current = false;
+    }
+  }, [publish]);
+
+  const deal = useCallback((bet) => {
+    clearTimeout(fallbackRef.current);
+    roundRef.current += 1;
+    return run(() => session.deal(bet));
+  }, [run, session]);
+
+  const hit = useCallback(() => run(() => session.hit()), [run, session]);
+  const stand = useCallback(() => run(() => session.stand()), [run, session]);
+  const doubleDown = useCallback((faceDown = true) => run(() => session.double(faceDown)), [run, session]);
+  const split = useCallback(() => run(() => session.split()), [run, session]);
+  const surrender = useCallback(() => run(() => session.surrender()), [run, session]);
+  const insurance = useCallback((take) => run(() => session.insurance(take)), [run, session]);
+
+  /** Pay out the finished round and write its history record. Idempotent. */
+  const settle = useCallback(() => {
+    clearTimeout(fallbackRef.current);
+    return session.settle();
+  }, [session]);
+
+  useEffect(() => () => clearTimeout(fallbackRef.current), []);
+
+  // The engine doesn't survive leaving the page: pay out a finished round, refund a hand in play.
+  useEffect(() => {
+    const leave = () => {
+      clearTimeout(fallbackRef.current);
+      session.abandon();
     };
-    init();
-  }, [engine]);
-
-  // Fix 1.3: handleGameEnd defined first using refs, no stale closure
-  const handleGameEnd = useCallback((state) => {
-    if (state.result && state.result.payout > 0) {
-      depositRef.current(state.result.payout);
-    }
-
-    endGameRef.current({
-      type: 'blackjack',
-      result: state.result.outcome,
-      bet: state.bet,
-      payout: state.result.payout,
-      netWin: state.result.payout - state.bet
-    });
-  }, []);
-
-  const startHand = useCallback(async (betAmount) => {
-    if (!isInitialized || balance < betAmount) {
-      return { success: false, error: 'Insufficient funds or not initialized' };
-    }
-
-    const withdrawResult = withdraw(betAmount);
-    if (!withdrawResult.success) {
-      return withdrawResult;
-    }
-
-    const state = await engine.startHand(betAmount);
-    setGameState(state);
-    setCurrentGame({
-      type: 'blackjack',
-      bet: betAmount,
-      startedAt: new Date().toISOString()
-    });
-
-    // Auto-resolve if blackjack or immediate finish
-    if (state.gameState === 'finished') {
-      handleGameEnd(state);
-    }
-
-    return { success: true, state };
-  }, [isInitialized, balance, withdraw, setCurrentGame, engine, handleGameEnd]);
-
-  const hit = useCallback(async () => {
-    const state = await engine.hit();
-    setGameState(state);
-
-    if (state.gameState === 'finished') {
-      handleGameEnd(state);
-    }
-
-    return state;
-  }, [engine, handleGameEnd]);
-
-  const stand = useCallback(async () => {
-    const state = await engine.stand();
-    setGameState(state);
-
-    if (state.gameState === 'finished') {
-      handleGameEnd(state);
-    }
-
-    return state;
-  }, [engine, handleGameEnd]);
-
-  // Fix 1.4: accept and forward the faceDown parameter
-  const doubleDown = useCallback(async (faceDown = true) => {
-    // Fix 1.2 compatible: use per-hand bet from handBets array
-    const currentHandBet = gameState?.handBets?.[gameState?.currentHandIndex] || gameState?.bet || 0;
-    const additionalBet = currentHandBet;
-
-    if (balance < additionalBet) {
-      return { success: false, error: 'Insufficient funds for double down' };
-    }
-
-    withdraw(additionalBet);
-    const state = await engine.doubleDown(faceDown);
-    setGameState(state);
-
-    if (state.gameState === 'finished') {
-      handleGameEnd(state);
-    }
-
-    return { success: true, state };
-  }, [engine, balance, withdraw, gameState, handleGameEnd]);
-
-  const split = useCallback(async () => {
-    // Fix 1.2 compatible: use per-hand bet
-    const currentHandBet = gameState?.handBets?.[gameState?.currentHandIndex] || gameState?.bet || 0;
-
-    if (balance < currentHandBet) {
-      return { success: false, error: 'Insufficient funds for split' };
-    }
-
-    withdraw(currentHandBet);
-    const state = await engine.split();
-    setGameState(state);
-
-    return { success: true, state };
-  }, [engine, balance, withdraw, gameState]);
+    const onHide = (e) => {
+      if (e.persisted) return; // bfcache: the page (and engine) comes back intact
+      leave();
+    };
+    window.addEventListener('pagehide', onHide);
+    return () => {
+      window.removeEventListener('pagehide', onHide);
+      leave();
+    };
+  }, [session]);
 
   return {
     gameState,
     isInitialized,
-    startHand,
+    balance,
+    deal,
+    startHand: deal,
     hit,
     stand,
     doubleDown,
     split,
-    balance
+    surrender,
+    insurance,
+    settle,
   };
 };
