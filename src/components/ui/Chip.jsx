@@ -6,7 +6,7 @@ import { formatMoney } from './RollingNumber';
  * Clay casino chips. Colours/materials live in objects.css (.chip, data-d).
  *   <Chip value size="xs|sm|md|lg" selected onClick />      single chip, seen from above
  *   <ChipStack amount size="xs|sm|md" showLabel />           side-ish view, greedy denominations
- *   <ChipRack values selected onSelect balance />            glass tray, radiogroup
+ *   <ChipRack values selected onSelect balance onChipPointerDown />  glass tray, radiogroup
  *   <ChipSelector selectedChip onSelectChip />               legacy alias
  */
 
@@ -197,6 +197,7 @@ export const ChipStack = memo(({ amount, size = 'md', showLabel = true, classNam
 
 export const ChipRack = memo(({
   values = CHIP_VALUES, selected, onSelect, balance, label = 'Chip value', className = '', disabled = false,
+  onChipPointerDown, // optional: (value, event) to let a chip be dragged out of the rack
 }) => {
   const refs = useRef([]);
   const isDisabled = (v) => disabled || (typeof balance === 'number' && v > balance);
@@ -243,6 +244,8 @@ export const ChipRack = memo(({
               data-selected={on || undefined}
               onClick={() => onSelect?.(v)}
               onKeyDown={(e) => onKeyDown(e, i)}
+              onPointerDown={onChipPointerDown && !off ? (e) => onChipPointerDown(v, e) : undefined}
+              data-draggable={onChipPointerDown && !off ? '' : undefined}
             >
               <Chip value={v} size="rack" selected={on} />
             </button>

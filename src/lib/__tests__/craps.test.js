@@ -794,7 +794,7 @@ describe('CrapsEngine', () => {
       expect(engine.bets.comeNumbers[6].amount).toBe(20);
     });
 
-    it('don\'t come numbers pay lay odds on a 7 and are returned (off) on a come-out 7', () => {
+    it('don\'t come numbers pay lay odds on any 7, come-out included (lay odds always work)', () => {
       engine.phase = 'point'; engine.point = 5;
       engine.bets.dontComeNumbers[4] = { amount: 10, odds: 40 };
       const win = engine.evaluateRoll(7, 4, 3).filter(o => o.bet?.startsWith('dontCome'));
@@ -802,8 +802,17 @@ describe('CrapsEngine', () => {
       expect(win.find(o => o.bet === 'dontComeOdds4').payout).toBe(40 + 20); // 1:2
       const e = new CrapsEngine();
       e.bets.dontComeNumbers[4] = { amount: 10, odds: 40 };
-      const off = e.evaluateRoll(7, 4, 3);
-      expect(off.find(o => o.bet === 'dontComeOdds4').result).toBe('push');
+      const comeOut = e.evaluateRoll(7, 4, 3);
+      expect(comeOut.find(o => o.bet === 'dontComeOdds4')).toMatchObject({ result: 'win', payout: 60 });
+    });
+
+    it('don\'t come lay odds lose when the number repeats on the come-out', () => {
+      const e = new CrapsEngine();
+      e.bets.dontComeNumbers[4] = { amount: 10, odds: 20 };
+      const o = e.evaluateRoll(4, 1, 3);
+      expect(o.find(x => x.bet === 'dontCome4').result).toBe('lose');
+      expect(o.find(x => x.bet === 'dontComeOdds4')).toMatchObject({ result: 'lose', payout: 0 });
+      expect(totalOnTable(e.bets)).toBe(0);
     });
   });
 
@@ -892,11 +901,123 @@ describe('CrapsEngine', () => {
       expect(engine.bets.passLine).toBe(25);
       expect(totalOnTable(engine.bets)).toBe(25);
     });
+    it('taking down the don\'t pass also takes down its lay odds', () => {
+      engine.placeBet('dontPass', 10);
+      engine.phase = 'point'; engine.point = 4;
+      engine.placeBet('dontPassOdds', 60);
+      const r = engine.removeSpot('dontPass');
+      expect(r.refund).toBe(70);
+      expect(totalOnTable(engine.bets)).toBe(0);
+      r.placements.forEach(p => engine.placeBet(p.betType, p.amount, p.number, { force: true, fresh: p.fresh }));
+      expect(engine.bets.dontPass).toBe(10);
+      expect(engine.bets.dontPassOdds).toBe(60);
+    });
     it('reduceBet takes back part of a bet', () => {
       engine.placeBet('place', 30, 6);
       expect(engine.reduceBet('place', 10, 6)).toBe(10);
       expect(engine.bets.place[6]).toBe(20);
       expect(engine.reduceBet('place', 100, 6)).toBe(20);
+    });
+  });
+
+  describe('clear: only the chips placed since the last roll', () => {
+    it('tracks new chips per spot and forgets them when the dice roll', async () => {
+      engine.placeBet('passLine', 10);
+      engine.placeBet('place', 12, 6);
+      expect(engine.fresh).toEqual({ passLine: 10, place6: 12 });
+      expect(engine.freshTotal()).toBe(22);
+      await engine.roll({ die1: 2, die2: 2 }); // point 4
+      expect(engine.fresh).toEqual({});
+      expect(engine.getGameState().fresh).toEqual({});
+    });
+
+    it('leaves working bets and contract bets up', async () => {
+      engine.placeBet('passLine', 10);
+      await engine.roll({ die1: 2, die2: 2 }); // point 4
+      engine.placeBet('place', 12, 6);
+      engine.placeBet('hardway', 5, 8);
+      engine.placeBet('odds', 30);
+      await engine.roll({ die1: 2, die2: 3 }); // 5: nothing resolves
+      // a new layer on top of the working bets
+      engine.placeBet('place', 6, 6);
+      engine.placeBet('field', 10);
+      const r = engine.clearNew();
+      expect(r.refund).toBe(16);
+      expect(engine.bets.place[6]).toBe(12);
+      expect(engine.bets.field).toBe(0);
+      expect(engine.bets.hardways[8]).toBe(5);
+      expect(engine.bets.odds).toBe(30);
+      expect(engine.bets.passLine).toBe(10);
+      expect(engine.freshTotal()).toBe(0);
+      // the placements put exactly that back, still counted as new
+      r.placements.forEach(p => engine.placeBet(p.betType, p.amount, p.number, { force: true, fresh: p.fresh }));
+      expect(engine.bets.place[6]).toBe(18);
+      expect(engine.bets.field).toBe(10);
+      expect(engine.freshTotal()).toBe(16);
+    });
+
+    it('clears nothing right after a roll', async () => {
+      engine.placeBet('passLine', 10);
+      engine.placeBet('field', 10);
+      await engine.roll({ die1: 3, die2: 3 }); // point 6, field loses
+      expect(engine.clearNew()).toEqual({ refund: 0, placements: [] });
+      expect(engine.bets.passLine).toBe(10);
+    });
+
+    it('undoing and taking down a spot keep the new-chip count honest', async () => {
+      engine.placeBet('passLine', 10);
+      await engine.roll({ die1: 2, die2: 2 });
+      engine.placeBet('place', 12, 6);
+      await engine.roll({ die1: 2, die2: 3 });
+      engine.placeBet('place', 6, 6);
+      expect(engine.reduceBet('place', 6, 6)).toBe(6);
+      expect(engine.fresh).toEqual({});
+      engine.placeBet('place', 6, 6);
+      const r = engine.removeSpot('place6'); // the whole stack: 12 working + 6 new
+      expect(r.refund).toBe(18);
+      expect(r.placements[0]).toMatchObject({ amount: 18, fresh: 6 });
+      expect(engine.fresh).toEqual({});
+    });
+
+    it('come odds added this roll clear, the come bet stays', async () => {
+      engine.phase = 'point'; engine.point = 5;
+      engine.bets.comeNumbers[6] = { amount: 10, odds: 0 };
+      engine.placeBet('comeOdds', 20, 6);
+      const r = engine.clearNew();
+      expect(r.refund).toBe(20);
+      expect(engine.bets.comeNumbers[6]).toEqual({ amount: 10, odds: 0 });
+    });
+  });
+
+  describe('snapshot / restore (the felt survives a reload)', () => {
+    it('round-trips bets, point and recent rolls', async () => {
+      engine.placeBet('passLine', 25);
+      await engine.roll({ die1: 4, die2: 4 }); // point 8
+      engine.placeBet('odds', 50);
+      engine.placeBet('place', 12, 6);
+      const snap = JSON.parse(JSON.stringify(engine.snapshot()));
+      const e = new CrapsEngine();
+      await e.initialize();
+      expect(e.restore(snap)).toBe(true);
+      expect(e.phase).toBe('point');
+      expect(e.point).toBe(8);
+      expect(e.puckPosition).toBe(8);
+      expect(e.bets.passLine).toBe(25);
+      expect(e.bets.odds).toBe(50);
+      expect(e.bets.place[6]).toBe(12);
+      expect(e.rollHistory).toHaveLength(1);
+      expect(e.freshTotal()).toBe(0);
+      expect(e.canRemoveSpot('passLine')).toMatchObject({ ok: false, locked: true });
+    });
+
+    it('rejects junk', () => {
+      expect(engine.restore(null)).toBe(false);
+      expect(engine.restore({ v: 2, bets: {} })).toBe(false);
+      expect(engine.restore({ v: 1, bets: { passLine: -5 } })).toBe(false);
+      expect(engine.restore({ v: 1, bets: { field: 'abc' } })).toBe(false);
+      expect(engine.restore({ v: 1, bets: { field: 2.5 } })).toBe(false);
+      expect(totalOnTable(engine.bets)).toBe(0);
+      expect(engine.phase).toBe('comeOut');
     });
   });
 

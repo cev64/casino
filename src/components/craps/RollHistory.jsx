@@ -15,7 +15,7 @@ export const RollHistory = memo(({ rolls, hint = false }) => {
   return (
     <div className="cr-history" role="group" aria-label="Recent rolls">
       {recent.length === 0 ? (
-        <span className="cr-history-empty">{hint ? 'Tap a spot to bet. Hold to take it down.' : 'No rolls yet'}</span>
+        <span className="cr-history-empty">{hint ? 'Tap a spot or drag a chip onto it. Hold or right-click to take it down.' : 'No rolls yet'}</span>
       ) : (
         <ol className="cr-history-list">
           <AnimatePresence initial={false}>

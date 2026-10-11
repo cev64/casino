@@ -18,8 +18,8 @@ const STACK_VARIANTS = {
 
 /**
  * One tappable place on the layout.
- *   tap          place the selected chip
- *   right-click  take the bet down (also long-press 500ms on touch, Delete from the keyboard)
+ *   tap / drop   place the selected chip, or the chip dragged from the rack onto it
+ *   right-click  take the bet down (also press and hold 500ms, Delete from the keyboard)
  *   contract bets show a lock and explain themselves when taken down
  */
 export const BetSpot = memo(({
@@ -38,6 +38,8 @@ export const BetSpot = memo(({
   chipsClass = '',
   hidden = false,
   hint = null, // small print under the amount
+  isNew = false, // some of the chips were placed since the last roll (Clear takes those back)
+  drop = null, // 'ok' | 'bad' while a dragged chip hovers this spot
   layoutId,
   onPlace,
   onRemove,
@@ -63,7 +65,6 @@ export const BetSpot = memo(({
     pointerType.current = e.pointerType || 'mouse';
     fired.current = false;
     if (busy || !hasBet || e.button > 0) return;
-    if (e.pointerType === 'mouse') return; // mouse uses right-click
     start.current = { x: e.clientX, y: e.clientY };
     btn.current?.setAttribute('data-pressing', '');
     timer.current = window.setTimeout(() => {
@@ -112,6 +113,8 @@ export const BetSpot = memo(({
       data-blocked={blockedReason ? '' : undefined}
       data-busy={busy || undefined}
       data-off={off || undefined}
+      data-new={(hasBet && isNew) || undefined}
+      data-drop={drop || undefined}
       hidden={hidden || undefined}
     >
       <button

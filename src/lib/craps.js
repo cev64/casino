@@ -10,7 +10,8 @@
  *  Odds           Pass odds (3-4-5x: 3x on 4/10, 4x on 5/9, 5x on 6/8) pay true odds
  *                 2:1 / 3:2 / 6:5. Come odds follow the same limits. Don't pass and
  *                 don't come lay odds (up to 6x the flat bet) pay 1:2 / 2:3 / 5:6.
- *                 Come / lay odds are OFF on a come-out roll (returned, never lost).
+ *                 Come odds are OFF on a come-out roll (returned, never lost); lay odds on
+ *                 don't come bets always work, as on a standard table.
  *  Field          One roll. Wins on 2 3 4 9 10 11 12, pays 1:1, and 2:1 on BOTH 2 and 12.
  *  Place          4/10 pay 9:5, 5/9 pay 7:5, 6/8 pay 7:6. Off on the come-out roll,
  *                 lose on a seven out, stay up after a win.
@@ -168,6 +169,18 @@ export const parseSpot = (id) => {
   return { betType, number };
 };
 
+/** The spot a (betType, number) placement sits on: the inverse of parseSpot. */
+export const spotIdFor = (betType, number = null) => {
+  switch (betType) {
+    case 'place': return `place${number}`;
+    case 'hardway': return `hard${number}`;
+    case 'horn': return `horn${number}`;
+    case 'comeOdds': case 'comeNumber': return `comeNum${number}`;
+    case 'dontComeOdds': case 'dontComeNumber': return `dontComeNum${number}`;
+    default: return betType;
+  }
+};
+
 /** Amount on a spot (flat + odds for come-number spots). */
 export const spotAmount = (bets, id) => {
   if (!bets) return 0;
@@ -184,7 +197,9 @@ export const spotAmount = (bets, id) => {
 };
 
 const FLAT_MIN_SPOTS = new Set(['passLine', 'dontPass', 'come', 'dontCome', 'field', 'big6', 'big8']);
-const isFlatMin = (id) => FLAT_MIN_SPOTS.has(id) || id.startsWith('place');
+/** Spots that need the table minimum ($5) before the dice can roll. */
+export const isFlatMinSpot = (id) => FLAT_MIN_SPOTS.has(id) || id.startsWith('place');
+const isFlatMin = isFlatMinSpot;
 
 export const maxPassOdds = (point, flat) => (point ? flat * ODDS_MULTIPLE[point] : 0);
 export const maxLayOdds = (flat) => flat * LAY_MULTIPLE;
@@ -240,6 +255,8 @@ export class CrapsEngine {
     this.point = null;
     this.puckPosition = null; // null or 4, 5, 6, 8, 9, 10
     this.bets = createEmptyBets();
+    /** Chips placed since the last roll, by spot id. Clear takes back only these. */
+    this.fresh = {};
     this.lastRoll = null;
     this.rollHistory = [];
   }
@@ -265,6 +282,8 @@ export class CrapsEngine {
     const phaseBefore = this.phase;
     const pointBefore = this.point;
     const before = cloneBets(this.bets);
+    // Once the dice fly every chip on the table is working: nothing is "new" any more.
+    this.fresh = {};
 
     let result;
     if (forced) {
@@ -436,8 +455,9 @@ export class CrapsEngine {
   }
 
   /**
-   * Come / don't come, including their travelling bets. `phaseAtRoll` matters for odds:
-   * come and lay odds are off on a come-out roll (returned instead of won or lost).
+   * Come / don't come, including their travelling bets. `phaseAtRoll` matters for come odds:
+   * they are off on a come-out roll (returned instead of won or lost). Lay odds on don't
+   * come bets are always working.
    */
   evaluateComeBets(total, phaseAtRoll = 'point') {
     const outcomes = [];
@@ -475,16 +495,14 @@ export class CrapsEngine {
       if (total === 7) {
         outcomes.push(withNet({ bet: `dontCome${n}`, result: 'win', amount: d.amount, payout: d.amount * 2, number: n, message: `Don't come on ${n} wins` }));
         if (d.odds > 0) {
-          if (oddsWorking) outcomes.push(withNet({ bet: `dontComeOdds${n}`, result: 'win', amount: d.odds, payout: d.odds + layWin(n, d.odds), number: n }));
-          else outcomes.push(withNet({ bet: `dontComeOdds${n}`, result: 'push', amount: d.odds, payout: d.odds, number: n }));
+          outcomes.push(withNet({ bet: `dontComeOdds${n}`, result: 'win', amount: d.odds, payout: d.odds + layWin(n, d.odds), number: n }));
         }
         d.amount = 0;
         d.odds = 0;
       } else if (total === n) {
         outcomes.push(withNet({ bet: `dontCome${n}`, result: 'lose', amount: d.amount, payout: 0, number: n, message: `Don't come on ${n} loses` }));
         if (d.odds > 0) {
-          if (oddsWorking) outcomes.push(withNet({ bet: `dontComeOdds${n}`, result: 'lose', amount: d.odds, payout: 0, number: n }));
-          else outcomes.push(withNet({ bet: `dontComeOdds${n}`, result: 'push', amount: d.odds, payout: d.odds, number: n }));
+          outcomes.push(withNet({ bet: `dontComeOdds${n}`, result: 'lose', amount: d.odds, payout: 0, number: n }));
         }
         d.amount = 0;
         d.odds = 0;
@@ -717,12 +735,18 @@ export class CrapsEngine {
 
   /**
    * Place `amount` on a bet. Returns { success, error? }. `force` skips validation and is
-   * used to restore bets that were just taken down.
+   * used to restore bets that were just taken down. `fresh` is how much of the amount counts
+   * as placed since the last roll (all of it for a new bet; a restore says how much).
    */
-  placeBet(betType, amount, number = null, { force = false } = {}) {
+  placeBet(betType, amount, number = null, { force = false, fresh } = {}) {
     if (!force) {
       const error = this.validateBet(betType, amount, number);
       if (error) return { success: false, error };
+    }
+    const newPart = Math.min(amount, fresh ?? (force ? 0 : amount));
+    if (newPart > 0) {
+      const id = spotIdFor(betType, number);
+      this.fresh[id] = (this.fresh[id] || 0) + newPart;
     }
     const b = this.bets;
     if (betType === 'place' && number) b.place[number] = (b.place[number] || 0) + amount;
@@ -747,7 +771,20 @@ export class CrapsEngine {
     else if (betType === 'hardway' && number) { taken = take(b.hardways[number]); b.hardways[number] -= taken; }
     else if (betType === 'horn' && number) { taken = take(b.horn[number]); b.horn[number] -= taken; }
     else if (betType in b && typeof b[betType] === 'number') { taken = take(b[betType]); b[betType] -= taken; }
+    if (taken > 0) this.dropFresh(spotIdFor(betType, number), taken);
     return taken;
+  }
+
+  /** Forget `amount` (default: all) of a spot's new chips after they left the table. */
+  dropFresh(spotId, amount = Infinity) {
+    const left = (this.fresh[spotId] || 0) - amount;
+    if (left > 0) this.fresh[spotId] = left;
+    else delete this.fresh[spotId];
+  }
+
+  /** Dollars placed since the last roll that are still on the table. */
+  freshTotal() {
+    return Object.values(this.fresh).reduce((s, v) => s + v, 0);
   }
 
   /** Is this bet a contract bet right now? Returns a reason string, or null when removable. */
@@ -808,18 +845,20 @@ export class CrapsEngine {
     const check = this.canRemoveSpot(spotId);
     if (!check.ok) return { refund: 0, placements: [], ...check };
     const b = this.bets;
+    const fresh = this.fresh[spotId] || 0; // new chips are always the odds / the top of the stack
+    delete this.fresh[spotId];
     const m = /^(comeNum|dontComeNum)(\d+)$/.exec(spotId);
     if (m) {
       const n = Number(m[2]);
       if (m[1] === 'comeNum') {
         const odds = b.comeNumbers[n].odds;
         b.comeNumbers[n].odds = 0;
-        return { refund: odds, placements: [{ betType: 'comeOdds', number: n, amount: odds, spot: spotId }] };
+        return { refund: odds, placements: [{ betType: 'comeOdds', number: n, amount: odds, spot: spotId, fresh }] };
       }
       const d = b.dontComeNumbers[n];
       const placements = [];
-      if (d.amount > 0) placements.push({ betType: 'dontComeNumber', number: n, amount: d.amount, spot: spotId });
-      if (d.odds > 0) placements.push({ betType: 'dontComeOdds', number: n, amount: d.odds, spot: spotId });
+      if (d.amount > 0) placements.push({ betType: 'dontComeNumber', number: n, amount: d.amount, spot: spotId, fresh: 0 });
+      if (d.odds > 0) placements.push({ betType: 'dontComeOdds', number: n, amount: d.odds, spot: spotId, fresh });
       const refund = d.amount + d.odds;
       d.amount = 0;
       d.odds = 0;
@@ -827,7 +866,36 @@ export class CrapsEngine {
     }
     const { betType, number } = parseSpot(spotId);
     const refund = this.removeBet(betType, number);
-    return { refund, placements: refund > 0 ? [{ betType, number, amount: refund, spot: spotId }] : [] };
+    const placements = refund > 0 ? [{ betType, number, amount: refund, spot: spotId, fresh }] : [];
+    // Lay odds can't stay behind a don't pass bet that is gone: they come down with it.
+    if (spotId === 'dontPass' && b.dontPassOdds > 0) {
+      const odds = b.dontPassOdds;
+      const oddsFresh = this.fresh.dontPassOdds || 0;
+      delete this.fresh.dontPassOdds;
+      b.dontPassOdds = 0;
+      placements.push({ betType: 'dontPassOdds', number: null, amount: odds, spot: 'dontPassOdds', fresh: oddsFresh });
+      return { refund: refund + odds, placements };
+    }
+    return { refund, placements };
+  }
+
+  /**
+   * Take back the chips placed since the last roll. Bets that were already working before the
+   * last roll stay where they are (take those down one at a time). Returns { refund, placements }.
+   */
+  clearNew() {
+    let refund = 0;
+    const placements = [];
+    Object.entries({ ...this.fresh }).forEach(([spotId, amount]) => {
+      const { betType, number } = parseSpot(spotId);
+      const taken = this.reduceBet(betType, amount, number);
+      if (taken > 0) {
+        refund += taken;
+        placements.push({ betType, number, amount: taken, spot: spotId, fresh: taken });
+      }
+    });
+    this.fresh = {};
+    return { refund, placements };
   }
 
   /** Take down every bet that may be taken down. Returns { refund, placements }. */
@@ -873,12 +941,47 @@ export class CrapsEngine {
       lastRoll: this.lastRoll,
       rollHistory: this.rollHistory.slice(),
       nonce: this.nonce,
+      fresh: { ...this.fresh },
     };
+  }
+
+  /** What must survive a reload: the bets on the felt, the point and the recent rolls. */
+  snapshot() {
+    return {
+      v: 1,
+      phase: this.phase,
+      point: this.point,
+      bets: cloneBets(this.bets),
+      rollHistory: this.rollHistory.slice(-30),
+    };
+  }
+
+  /** Put a snapshot() back. Returns false (and changes nothing) if it doesn't look valid. */
+  restore(snap) {
+    if (!snap || snap.v !== 1 || !snap.bets) return false;
+    const point = snap.phase === 'point' && POINTS.includes(snap.point) ? snap.point : null;
+    const bets = cloneBets(snap.bets);
+    const amounts = [];
+    const walk = (v) => {
+      if (v && typeof v === 'object') Object.values(v).forEach(walk);
+      else amounts.push(v);
+    };
+    walk(bets);
+    if (amounts.some((a) => !Number.isInteger(a) || a < 0)) return false;
+    this.phase = point ? 'point' : 'comeOut';
+    this.point = point;
+    this.puckPosition = point;
+    this.bets = bets;
+    this.fresh = {};
+    this.rollHistory = Array.isArray(snap.rollHistory) ? snap.rollHistory.slice(-30) : [];
+    this.lastRoll = this.rollHistory[this.rollHistory.length - 1] || null;
+    return true;
   }
 
   resetBets() {
     const oldBets = cloneBets(this.bets);
     this.bets = createEmptyBets();
+    this.fresh = {};
     return oldBets;
   }
 }
