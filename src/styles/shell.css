@@ -213,3 +213,13 @@
   .spark-line { stroke-dashoffset: 0; animation: none; }
   .spark-area { opacity: 1; animation: none; }
 }
+
+/* Balance pill: a small bump as winnings land in it */
+.wallet { transform-origin: center; }
+.wallet[data-bump] { animation: wallet-bump .42s var(--spring-soft); }
+@keyframes wallet-bump {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.08); background-color: color-mix(in srgb, var(--good) 22%, transparent); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) { .wallet[data-bump] { animation: none; } }

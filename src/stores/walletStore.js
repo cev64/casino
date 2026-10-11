@@ -31,6 +31,16 @@ export const useWalletStore = create((set, get) => ({
     return newBalance;
   },
 
+  /*
+   * Display only. `held` is money already in `balance` (and saved) that the balance pill
+   * doesn't show yet because its chips are still flying to it. Never persisted, so a reload
+   * mid-flight shows the full balance. `arrivals` counts landings (the pill bumps on each).
+   */
+  held: 0,
+  arrivals: 0,
+  hold: (amount) => set((s) => ({ held: s.held + Math.max(0, amount) })),
+  release: (amount = Infinity) => set((s) => ({ held: Math.max(0, s.held - amount), arrivals: s.arrivals + 1 })),
+
   refresh: () => {
     const balance = getWalletBalance();
     set({ balance });

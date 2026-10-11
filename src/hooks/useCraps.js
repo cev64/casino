@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { CrapsEngine, SPOT_IDS, parseSpot, spotAmount, totalOnTable, TABLE_LIMITS } from '../lib/craps';
 import { useWalletStore } from '../stores/walletStore';
 import { useGameStore } from '../stores/gameStore';
+import { useSettingsStore } from '../stores/settingsStore';
 import { getCrapsTable, setCrapsTable } from '../utils/localStorage';
 
 /**
@@ -225,6 +226,7 @@ export const useCraps = () => {
     }
 
     rebetPlan.current = engine.spotAmounts();
+    engine.takeDownWins = !!useSettingsStore.getState().crapsTakeDownWins;
     rolling.current = true;
     let result;
     try {

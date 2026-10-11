@@ -21,6 +21,9 @@
  *  One roll       Any seven 4:1, any craps 7:1, and single-number horn bets:
  *                 2 and 12 pay 30:1, 3 and 11 pay 15:1.
  *
+ *  Take down wins Optional (`takeDownWins`): a winning place bet, hardway or Big 6/8 comes
+ *                 down and is paid back with its winnings instead of staying up.
+ *
  *  Winnings are paid in whole dollars (fractions round down).
  *  Table limits: $5 minimum / $500 maximum on every spot; proposition and odds bets may
  *  start at $1 (odds are capped by their multiple instead of the table maximum).
@@ -234,6 +237,52 @@ export const summarizeRoll = (r) => {
   return { title: numberWord(total), kind: 'number' };
 };
 
+/** The spot a roll outcome belongs to ('come6' and 'comeOdds6' both sit on 'comeNum6'). */
+export const outcomeSpotId = (bet) => {
+  let m = /^comeOdds(\d+)$/.exec(bet) || /^come(\d+)$/.exec(bet);
+  if (m) return `comeNum${m[1]}`;
+  m = /^dontComeOdds(\d+)$/.exec(bet) || /^dontCome(\d+)$/.exec(bet);
+  if (m) return `dontComeNum${m[1]}`;
+  return bet;
+};
+
+const money = (n) => `$${n.toLocaleString('en-US')}`;
+
+/**
+ * What a roll did to each bet, in plain words, most important first:
+ *   "Place 6 pays $7, bet stays up", "Pass line pays $25", "Field loses $10",
+ *   "Come bet on 8 loses $10, odds returned", "Come odds returned".
+ * Line odds are told together with their line bet. `r` is the object roll() returns.
+ */
+export const describeOutcomes = (r) => {
+  const groups = new Map();
+  (r?.resolved || []).forEach((o) => {
+    let id = outcomeSpotId(o.bet);
+    if (id === 'odds') id = 'passLine';
+    if (id === 'dontPassOdds') id = 'dontPass';
+    const g = groups.get(id) || { id, win: 0, stays: false, lost: 0, pushed: 0, hasWin: false, hasLose: false, hasPush: false };
+    if (o.result === 'win') { g.hasWin = true; g.win += o.net; g.stays = g.stays || o.stays; }
+    if (o.result === 'lose') { g.hasLose = true; g.lost += o.amount; }
+    if (o.result === 'push') { g.hasPush = true; g.pushed += o.amount; }
+    groups.set(id, g);
+  });
+  const wins = [];
+  const losses = [];
+  const pushes = [];
+  groups.forEach((g) => {
+    const label = spotLabel(g.id);
+    const rides = /^(place|hard|big)/.test(g.id); // these stay up after a win unless taken down
+    let tail = '';
+    if (g.stays) tail = ', bet stays up';
+    else if (rides) tail = ', bet comes down';
+    if (g.hasWin) wins.push({ size: g.win, text: `${label} pays ${money(g.win)}${tail}` });
+    else if (g.hasLose) losses.push({ size: g.lost, text: `${label} loses ${money(g.lost)}${g.hasPush ? ', odds returned' : ''}` });
+    else if (g.hasPush) pushes.push({ size: g.pushed, text: `${label} returned` });
+  });
+  const bySize = (a, b) => b.size - a.size;
+  return [...wins.sort(bySize), ...losses.sort(bySize), ...pushes.sort(bySize)].map((x) => x.text);
+};
+
 /* ------------------------------------------------------------------ */
 /* Engine                                                              */
 /* ------------------------------------------------------------------ */
@@ -254,6 +303,8 @@ export class CrapsEngine {
     this.phase = 'comeOut'; // 'comeOut' or 'point'
     this.point = null;
     this.puckPosition = null; // null or 4, 5, 6, 8, 9, 10
+    /** Player option: winning place / hardway / Big 6-8 bets come down instead of staying up. */
+    this.takeDownWins = false;
     this.bets = createEmptyBets();
     /** Chips placed since the last roll, by spot id. Clear takes back only these. */
     this.fresh = {};
@@ -568,7 +619,8 @@ export class CrapsEngine {
 
     if (b.place[total] > 0) {
       const amount = b.place[total];
-      outcomes.push(withNet({ bet: `place${total}`, result: 'win', amount, payout: this.calculatePlacePayout(total, amount), stays: true, number: total, message: `Place ${total} wins` }));
+      outcomes.push(this.multiRollWin({ bet: `place${total}`, amount, win: this.calculatePlacePayout(total, amount), number: total, message: `Place ${total} wins` }));
+      if (this.takeDownWins) b.place[total] = 0;
     }
 
     if (total === 7) {
@@ -590,7 +642,8 @@ export class CrapsEngine {
       const key = `big${n}`;
       if (b[key] <= 0) return;
       if (total === n) {
-        outcomes.push(withNet({ bet: key, result: 'win', amount: b[key], payout: b[key], stays: true, message: `Big ${n} wins` }));
+        outcomes.push(this.multiRollWin({ bet: key, amount: b[key], win: b[key], message: `Big ${n} wins` }));
+        if (this.takeDownWins) b[key] = 0;
       } else if (total === 7) {
         outcomes.push(withNet({ bet: key, result: 'lose', amount: b[key], payout: 0 }));
         b[key] = 0;
@@ -609,7 +662,8 @@ export class CrapsEngine {
     if (HARD_NUMBERS.includes(total) && b.hardways[total] > 0) {
       const amount = b.hardways[total];
       if (isHard) {
-        outcomes.push(withNet({ bet: `hard${total}`, result: 'win', amount, payout: amount * HARDWAY_PAYS[total], stays: true, message: `Hard ${total} wins` }));
+        outcomes.push(this.multiRollWin({ bet: `hard${total}`, amount, win: amount * HARDWAY_PAYS[total], message: `Hard ${total} wins` }));
+        if (this.takeDownWins) b.hardways[total] = 0;
       } else {
         outcomes.push(withNet({ bet: `hard${total}`, result: 'lose', amount, payout: 0, message: `Hard ${total} loses, easy way` }));
         b.hardways[total] = 0;
@@ -653,6 +707,16 @@ export class CrapsEngine {
     });
 
     return outcomes;
+  }
+
+  /**
+   * A win on a bet that normally stays up (place, hardway, Big 6/8): only the winnings are
+   * paid and the stake rides, unless the player takes wins down (stake comes back too).
+   * The caller clears the stake from the table when `takeDownWins` is set.
+   */
+  multiRollWin({ win, amount, ...rest }) {
+    const down = this.takeDownWins;
+    return withNet({ ...rest, result: 'win', amount, payout: down ? amount + win : win, stays: !down });
   }
 
   calculatePlacePayout(number, betAmount) {

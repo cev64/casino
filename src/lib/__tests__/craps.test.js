@@ -15,7 +15,7 @@ vi.mock('../../utils/localStorage', () => ({
 }));
 
 const craps = await import('../craps');
-const { CrapsEngine, totalOnTable, summarizeRoll, TABLE_LIMITS } = craps;
+const { CrapsEngine, totalOnTable, summarizeRoll, describeOutcomes, TABLE_LIMITS } = craps;
 
 describe('CrapsEngine', () => {
   let engine;
@@ -1018,6 +1018,92 @@ describe('CrapsEngine', () => {
       expect(engine.restore({ v: 1, bets: { field: 2.5 } })).toBe(false);
       expect(totalOnTable(engine.bets)).toBe(0);
       expect(engine.phase).toBe('comeOut');
+    });
+  });
+
+  describe('take down wins (player option)', () => {
+    const pointOn = async (e, a, b) => { e.placeBet('passLine', 10); await e.roll({ die1: a, die2: b }); };
+
+    it('pays a winning place bet back with its stake and clears the spot', async () => {
+      await pointOn(engine, 2, 2); // point 4
+      engine.takeDownWins = true;
+      engine.placeBet('place', 12, 6);
+      const r = await engine.roll({ die1: 4, die2: 2 });
+      const o = r.resolved.find((x) => x.bet === 'place6');
+      expect(o).toMatchObject({ result: 'win', amount: 12, payout: 12 + 14, stays: false, net: 14 });
+      expect(engine.bets.place[6]).toBe(0);
+      expect(r.payout).toBe(26);
+      expect(describeOutcomes(r)).toEqual(['Place 6 pays $14, bet comes down']);
+    });
+
+    it('does the same for hardways and Big 6 / 8', async () => {
+      await pointOn(engine, 2, 3); // point 5
+      engine.takeDownWins = true;
+      engine.placeBet('hardway', 5, 8);
+      engine.placeBet('big8', 10);
+      const r = await engine.roll({ die1: 4, die2: 4 });
+      expect(r.resolved.find((x) => x.bet === 'hard8')).toMatchObject({ payout: 5 + 45, stays: false, net: 45 });
+      expect(r.resolved.find((x) => x.bet === 'big8')).toMatchObject({ payout: 20, stays: false, net: 10 });
+      expect(engine.bets.hardways[8]).toBe(0);
+      expect(engine.bets.big8).toBe(0);
+    });
+
+    it('wins the same either way, and the books balance', async () => {
+      const nets = [];
+      for (const down of [false, true]) {
+        const e = new CrapsEngine();
+        e.takeDownWins = down;
+        let wallet = 1000;
+        const bet = (t, a, n) => { if (e.placeBet(t, a, n).success) wallet -= a; };
+        bet('passLine', 10);
+        await e.roll({ die1: 3, die2: 3 }); // point 6
+        bet('place', 10, 5); bet('hardway', 5, 8); bet('big8', 10);
+        let net = 0;
+        for (const [a, b] of [[3, 2], [4, 4], [6, 1]]) { // place 5 wins, hard 8 + big 8 win, seven out
+          const r = await e.roll({ die1: a, die2: b });
+          wallet += r.payout;
+          net += r.net;
+          expect(wallet + totalOnTable(e.bets)).toBe(1000 + net);
+        }
+        nets.push(net);
+      }
+      // staying up, the bets are lost on the seven out; taken down, they were already home
+      expect(nets[0]).toBe(14 + 45 + 10 - 10 - 10 - 5 - 10);
+      expect(nets[1]).toBe(14 + 45 + 10 - 10);
+    });
+  });
+
+  describe('describeOutcomes', () => {
+    it('says what each bet did, wins first', async () => {
+      engine.placeBet('passLine', 10);
+      await engine.roll({ die1: 2, die2: 2 }); // point 4
+      engine.placeBet('place', 6, 6);
+      engine.placeBet('field', 10);
+      engine.placeBet('hardway', 5, 8);
+      const r = await engine.roll({ die1: 5, die2: 1 }); // easy 6
+      expect(describeOutcomes(r)).toEqual(['Place 6 pays $7, bet stays up', 'Field loses $10']);
+      const out = await engine.roll({ die1: 2, die2: 2 }); // point made, hard 4
+      expect(describeOutcomes(out)).toEqual(['Pass line pays $10']);
+    });
+
+    it('tells line odds with their line bet', async () => {
+      engine.placeBet('passLine', 10);
+      await engine.roll({ die1: 3, die2: 3 }); // point 6
+      engine.placeBet('odds', 50);
+      const r = await engine.roll({ die1: 4, die2: 2 });
+      expect(describeOutcomes(r)).toEqual(['Pass line pays $70']); // 10 + 60
+    });
+
+    it('a lost come bet whose odds come back says both', () => {
+      engine.bets.comeNumbers[8] = { amount: 10, odds: 50 };
+      const outcomes = engine.evaluateRoll(7, 4, 3); // come-out 7: come odds are off
+      const resolved = outcomes.filter((o) => ['win', 'lose', 'push'].includes(o.result));
+      expect(describeOutcomes({ resolved })).toEqual(['Come bet on 8 loses $10, odds returned']);
+    });
+
+    it('is empty when nothing settled', () => {
+      expect(describeOutcomes({ resolved: [] })).toEqual([]);
+      expect(describeOutcomes(null)).toEqual([]);
     });
   });
 

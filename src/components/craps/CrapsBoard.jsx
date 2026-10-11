@@ -64,7 +64,8 @@ export const CrapsBoard = memo(({
           const isThePoint = point === n;
           return (
             <div key={n} className={`cr-num ga-n${n}`} data-point={isThePoint || undefined} data-n={n}>
-              {dcTotal > 0 ? (
+              {/* the lay strip appears only once a don't come bet travels here; until then the number box fills it */}
+              {dcTotal > 0 && (
                 <BetSpot
                   label={spotLabel(`dontComeNum${n}`)}
                   amount={dcTotal}
@@ -76,8 +77,6 @@ export const CrapsBoard = memo(({
                 >
                   <span className="cr-print cr-tiny">Lay</span>
                 </BetSpot>
-              ) : (
-                <div className="cr-lay cr-lay-empty" aria-hidden="true"><span className="cr-print cr-tiny">Lay</span></div>
               )}
 
               <BetSpot

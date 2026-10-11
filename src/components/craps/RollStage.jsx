@@ -10,6 +10,7 @@ import { formatMoney } from '../ui/RollingNumber';
  */
 export const RollStage = memo(({ dice, rolling, summary, onDiceSettled }) => {
   const status = summary?.status;
+  const details = summary?.details || []; // "Place 6 pays $7, bet stays up", most important first
   return (
     <div className="cr-stage" data-rolling={rolling || undefined}>
       <AnimatePresence mode="wait">
@@ -25,11 +26,19 @@ export const RollStage = memo(({ dice, rolling, summary, onDiceSettled }) => {
           >
             <span className="cr-result-total tnum">{summary.total}</span>
             <span className="cr-result-text">
-              <span className="cr-result-title">{summary.title}</span>
-              {status && (
-                <span className="cr-result-net tnum" data-tone={summary.net > 0 ? 'good' : summary.net < 0 ? 'bad' : undefined}>
-                  <span>{status}</span>
-                  {summary.net !== 0 && <span>{formatMoney(summary.net, { signed: true })}</span>}
+              <span className="cr-result-head">
+                <span className="cr-result-title">{summary.title}</span>
+                {status && (
+                  <span className="cr-result-net tnum" data-tone={summary.net > 0 ? 'good' : summary.net < 0 ? 'bad' : undefined}>
+                    <span>{status}</span>
+                    {summary.net !== 0 && <span>{formatMoney(summary.net, { signed: true })}</span>}
+                  </span>
+                )}
+              </span>
+              {details.length > 0 && (
+                <span className="cr-result-detail" title={details.join('\n')}>
+                  {details.slice(0, 2).join(' · ')}
+                  {details.length > 2 && ` · ${details.length - 2} more`}
                 </span>
               )}
             </span>
