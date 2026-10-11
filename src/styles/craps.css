@@ -176,9 +176,13 @@
 .cr-num[data-point] { background: rgb(var(--felt-ink) / .1); border-color: var(--cr-line-strong); }
 .cr-lay, .cr-placebox { border-radius: 0; }
 .cr-lay { border-radius: 8px 8px 0 0; border-bottom: 1.5px solid var(--cr-line); }
-.cr-lay-empty { display: grid; place-items: center; }
+/* No don't come bet here: no lay strip. The place box takes the whole number box, and the
+   numeral keeps its place so nothing moves when a lay strip does appear. */
+.cr-num:not(:has(> .cr-lay)) .cr-placebox { grid-row: 1 / -1; border-radius: 8px; }
+.cr-num:not(:has(> .cr-lay)) .cr-placebox .cr-art { padding-top: calc(var(--lay-h) + 5px); }
+.cr-num:not(:has(> .cr-lay)) .cr-placebox[data-has-bet] .cr-hit { padding-top: calc(var(--lay-h) + 6px); }
 .cr-lay .cr-hit::after { content: ''; position: absolute; inset: -2px; }
-.cr-lay .cr-tiny, .cr-lay-empty .cr-tiny { opacity: .6; }
+.cr-lay .cr-tiny { opacity: .6; }
 .cr-lay .cr-chips { align-items: center; }
 .cr-placebox { border-radius: 0 0 8px 8px; }
 .cr-placebox .cr-art { justify-content: flex-start; padding-top: 5px; }
@@ -259,8 +263,14 @@
   background: var(--fill-2); font-size: 17px; line-height: 1; font-weight: 600; color: var(--ink);
 }
 .cr-result-text { display: flex; flex-direction: column; min-width: 0; }
+.cr-result-head { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; min-width: 0; }
+/* what each bet did, in words: "Place 6 pays $7, bet stays up" */
+.cr-result-detail {
+  font-size: 13px; line-height: 17px; font-weight: 500; color: var(--ink-2);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
 .cr-result-title { font-size: 17px; line-height: 22px; font-weight: 600; letter-spacing: -.2px; color: var(--ink); white-space: normal; }
-.cr-result-net { display: flex; gap: 8px; font-size: 14px; line-height: 18px; font-weight: 500; color: var(--ink-2); }
+.cr-result-net { display: flex; gap: 8px; font-size: 14px; line-height: 18px; font-weight: 600; color: var(--ink-2); white-space: nowrap; }
 .cr-result-net[data-tone="good"] { color: var(--good); }
 .cr-result-net[data-tone="bad"] { color: var(--bad); }
 
@@ -489,6 +499,7 @@
    ========================================================================== */
 @media (min-width: 600px) and (max-height: 959px) {
   .cr-root { gap: 10px; }
+  .cr-result-detail { -webkit-line-clamp: 1; }
   .cr-readout { padding: 6px 20px; }
   .cr-felt.felt { --rail: 12px; --felt-pad: 8px; --rt: 24px; --rbh: 24px; --rbv: 24px; }
   .cr-num { grid-template-rows: 28px minmax(0, 1fr); }
@@ -497,7 +508,7 @@
   .cr-placebox .cr-art { padding-top: 4px; }
   .cr-big[data-has-bet] .cr-big-text { font-size: 18px; }
   .cr-big[data-has-bet] .cr-big-text small { font-size: 11px; }
-  .cr-lay .cr-tiny, .cr-lay-empty .cr-tiny { font-size: 9px; }
+  .cr-lay .cr-tiny { font-size: 9px; }
 }
 @container crapsfelt (min-width: 540px) {
   @media (max-height: 959px) {
@@ -667,3 +678,9 @@ html.cr-dragging, html.cr-dragging * { cursor: grabbing !important; -webkit-user
 /* where it would land */
 .cr-spot[data-drop="ok"] .cr-hit { background: rgb(var(--felt-ink) / .2); box-shadow: inset 0 0 0 2px rgb(var(--felt-ink) / .9); }
 .cr-spot[data-drop="bad"] .cr-hit { background: rgb(0 0 0 / .24); box-shadow: inset 0 0 0 2px rgb(255 130 130 / .75); }
+
+/* ---------- Payout chips flying to the balance pill (portalled to <body>) ---------- */
+
+.cr-flights { position: fixed; inset: 0; z-index: 900; pointer-events: none; }
+.cr-flight { position: fixed; margin: -16px 0 0 -16px; line-height: 0; will-change: transform; }
+.cr-flight .chip { box-shadow: 0 8px 16px -6px rgb(0 0 0 / .5), 0 2px 4px rgb(0 0 0 / .3); }

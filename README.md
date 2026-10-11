@@ -5,10 +5,10 @@ Blackjack and craps in the browser, with play money and provably fair randomness
 ## Features
 
 - **Blackjack.** Six-deck shoe, dealer stands on soft 17, blackjack pays 3 to 2. Dealer peeks for blackjack. Hit, stand, double (also after a split), split up to four hands, insurance, even money and late surrender.
-- **Craps.** Pass and don't pass, come and don't come with odds and lay odds (3-4-5x), place, Big 6 and 8, field, hardways and one-roll bets, with a dealer puck and a shooter's point. Tap a spot or drag a chip from the rack onto it; press and hold or right-click to take a bet down. Clear takes back only the chips placed since the last roll. Bets on the felt survive a reload.
+- **Craps.** Pass and don't pass, come and don't come with odds and lay odds (3-4-5x), place, Big 6 and 8, field, hardways and one-roll bets, with a dealer puck and a shooter's point. Tap a spot or drag a chip from the rack onto it; press and hold or right-click to take a bet down. Clear takes back only the chips placed since the last roll. Bets on the felt survive a reload. Winnings fly to the balance, and the result line says what each bet did ("Place 6 pays $7, bet stays up"); Settings can take winning place bets, hardways and Big 6/8 down instead of letting them ride.
 - **Provably fair.** Every shuffle and roll is derived from `SHA-256(serverSeed:clientSeed:nonce)`. The Provably fair sheet in Settings recomputes a roll or the opening cards of a shoe from seeds you paste in.
 - **History.** Results grouped by day with net result, win rate and a running chart. Clearing history can be undone.
-- **Settings.** System, light or dark theme, sound, haptics, and a balance reset that can be undone.
+- **Settings.** System, light or dark theme, sound, haptics, taking craps bets down after a win, and a balance reset that can be undone.
 - **Both tables stay live.** Switching between Blackjack and Craps keeps your hand and placed bets.
 
 ### Keyboard

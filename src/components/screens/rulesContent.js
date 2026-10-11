@@ -132,6 +132,7 @@ export const RULES = {
           { term: 'Come odds', text: 'Odds on Come bets are off on the come out roll. If that roll would settle them, the odds are returned as a push.' },
           { term: 'Lay odds', text: 'Lay odds on Don’t Come bets always work, the come out roll included.' },
           { term: 'Place bets', text: 'Off on the come out roll. They stay up after a win and lose on a 7.' },
+          { term: 'After a win', text: 'A winning place bet, hardway or Big 6 or 8 pays its winnings to your balance and the bet stays up for the next roll. Turn on Take bets down after a win in Settings to get the bet back too.' },
           { term: 'Hardways', text: 'Off on the come out roll. They stay up after a win and lose on a 7 or when the number rolls the easy way.' },
           { term: 'Big 6 and Big 8', text: 'Pay 1 to 1 and lose on any 7.' },
           { term: 'Limits', text: 'Bets run from $5 to $500. Odds and one roll bets can start at $1.' },

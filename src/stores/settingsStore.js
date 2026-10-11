@@ -22,6 +22,8 @@ const initial = (() => {
     theme: s.theme || 'system', // 'system' | 'light' | 'dark'
     sound: s.soundEnabled ?? s.sound ?? true,
     haptics: s.haptics ?? true,
+    // Craps: a winning place bet, hardway or Big 6/8 comes back with its winnings instead of riding
+    crapsTakeDownWins: s.crapsTakeDownWins ?? false,
   };
 })();
 
@@ -43,6 +45,10 @@ export const useSettingsStore = create((set) => ({
   setHaptics: (haptics) => {
     updateSettings({ haptics });
     set({ haptics });
+  },
+  setCrapsTakeDownWins: (crapsTakeDownWins) => {
+    updateSettings({ crapsTakeDownWins });
+    set({ crapsTakeDownWins });
   },
 }));
 

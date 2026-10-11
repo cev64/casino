@@ -7,12 +7,16 @@ import { WinCelebration } from '../ui/WinCelebration';
 import { RollingNumber, formatMoney } from '../ui/RollingNumber';
 import { toast } from '../ui/Toast';
 import { sounds } from '../../utils/sounds';
-import { summarizeRoll, spotLabel, spotAmount, isFlatMinSpot, TABLE_LIMITS } from '../../lib/craps';
+import {
+  summarizeRoll, describeOutcomes, outcomeSpotId, spotLabel, spotAmount, isFlatMinSpot, TABLE_LIMITS,
+} from '../../lib/craps';
+import { useWalletStore } from '../../stores/walletStore';
 import { Chip } from '../ui/Chip';
 import { CrapsBoard } from './CrapsBoard';
 import { ControlDock, RACK_VALUES } from './ControlDock';
 import { RollHistory } from './RollHistory';
 import { useChipDrag } from './useChipDrag';
+import { PayoutFlight } from './PayoutFlight';
 
 /* ------------------------------------------------------------------------------------------------
  * Timing. The engine resolves a roll instantly; the table plays it back at a human pace so that
@@ -46,20 +50,11 @@ const notify = (message, opts) => {
   toast(message, opts);
 };
 
-/** Which spot shows the result of an outcome. */
-const outcomeSpot = (bet) => {
-  let m = /^comeOdds(\d+)$/.exec(bet) || /^come(\d+)$/.exec(bet);
-  if (m) return `comeNum${m[1]}`;
-  m = /^dontComeOdds(\d+)$/.exec(bet) || /^dontCome(\d+)$/.exec(bet);
-  if (m) return `dontComeNum${m[1]}`;
-  return bet;
-};
-
 const buildMarks = (result) => {
   const marks = {};
   result.outcomes.forEach((o) => {
     if (o.result !== 'win' && o.result !== 'lose' && o.result !== 'push') return;
-    const id = outcomeSpot(o.bet);
+    const id = outcomeSpotId(o.bet);
     const cur = marks[id] || { result: null, profit: 0 };
     cur.profit += Math.max(0, o.net);
     // One spot can carry a flat bet and its odds. A win shows as a win; otherwise a lost flat
@@ -70,6 +65,26 @@ const buildMarks = (result) => {
   });
   return marks;
 };
+
+/** Payout chips leave each spot that pays for the balance pill. Measured before the table changes. */
+const planFlights = (result, root) => {
+  if (prefersReduced() || !root) return [];
+  const pill = document.querySelector('.topbar .wallet')?.getBoundingClientRect();
+  if (!pill || !pill.width) return [];
+  const to = { x: pill.left + pill.width / 2, y: pill.top + pill.height / 2 };
+  const perSpot = new Map();
+  result.resolved.forEach((o) => {
+    if (o.payout > 0) perSpot.set(outcomeSpotId(o.bet), (perSpot.get(outcomeSpotId(o.bet)) || 0) + o.payout);
+  });
+  const stamp = Date.now();
+  return [...perSpot].flatMap(([id, amount]) => {
+    const r = root.querySelector(`.cr-spot[data-spot="${id}"]`)?.getBoundingClientRect();
+    if (!r || !r.width) return [];
+    const from = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    return [{ key: `${stamp}-${id}`, id, amount, from, dx: to.x - from.x, dy: to.y - from.y }];
+  });
+};
+const FLIGHT_SAFETY_MS = 3000; // the pill shows the full balance by then whatever happens
 
 const firstSeenKey = 'casino.craps.hintSeen';
 const readHint = () => { try { return localStorage.getItem(firstSeenKey) === '1'; } catch { return true; } };
@@ -88,6 +103,7 @@ export const CrapsTable = ({ active = true }) => {
   const [summary, setSummary] = useState(null);
   const [marks, setMarks] = useState({});
   const [travel, setTravel] = useState(null);
+  const [flights, setFlights] = useState([]);
   const [celebrate, setCelebrate] = useState({ show: false, payout: 0 });
   const [hintSeen, setHintSeen] = useState(readHint);
 
@@ -98,7 +114,29 @@ export const CrapsTable = ({ active = true }) => {
   const alive = useRef(true);
   const busyRef = useRef(false);
   const clearMarksTimer = useRef(0);
-  useEffect(() => { alive.current = true; return () => { alive.current = false; clearTimeout(clearMarksTimer.current); }; }, []);
+
+  // Winnings in flight to the balance pill: the pill holds them back until they land.
+  const inFlight = useRef(0);
+  const flightTimer = useRef(0);
+  const settleFlights = useCallback(() => {
+    clearTimeout(flightTimer.current);
+    if (inFlight.current > 0) useWalletStore.getState().release(inFlight.current);
+    inFlight.current = 0;
+    setFlights([]);
+  }, []);
+  const landFlight = useCallback((f) => {
+    const amount = Math.min(f.amount, inFlight.current);
+    if (amount <= 0) return;
+    inFlight.current -= amount;
+    useWalletStore.getState().release(amount);
+    sounds.chipStack?.();
+    if (inFlight.current <= 0) settleFlights();
+  }, [settleFlights]);
+
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; clearTimeout(clearMarksTimer.current); settleFlights(); };
+  }, [settleFlights]);
 
   // Keep the selected chip affordable.
   useEffect(() => {
@@ -246,6 +284,7 @@ export const CrapsTable = ({ active = true }) => {
     busyRef.current = true;
     setBusy(true);
     dismissMarks();
+    settleFlights();
     setSummary(null);
     revealStage();
     sounds.diceShake?.();
@@ -281,6 +320,16 @@ export const CrapsTable = ({ active = true }) => {
     const moved = result.outcomes.find((o) => o.result === 'moved' && o.bet === 'come');
     setTravel(moved ? { from: 'come', to: moved.toNumber } : null);
     const nextMarks = buildMarks(result);
+    const plan = planFlights(result, rootRef.current);
+    const flying = plan.reduce((sum, f) => sum + f.amount, 0);
+    if (flying > 0) {
+      // hold first: the deposit below must not show in the pill before the chips get there
+      useWalletStore.getState().hold(flying);
+      inFlight.current += flying;
+      setFlights(plan);
+      clearTimeout(flightTimer.current);
+      flightTimer.current = setTimeout(settleFlights, FLIGHT_SAFETY_MS);
+    }
     commitRoll(result);
     setMarks(nextMarks);
 
@@ -292,6 +341,7 @@ export const CrapsTable = ({ active = true }) => {
       ...words,
       total: result.roll.total,
       net,
+      details: describeOutcomes(result),
       status: money ? (net > 0 ? 'Win' : net < 0 ? 'Loss' : result.resolved.every((o) => o.result === 'push') ? 'Push' : 'Even') : null,
     });
 
@@ -318,7 +368,7 @@ export const CrapsTable = ({ active = true }) => {
       setMarks({});
       setTravel(null);
     }, t.RESOLVE_MS);
-  }, [roll, rollBlockedReason, commitRoll, dismissMarks, revealStage]);
+  }, [roll, rollBlockedReason, commitRoll, dismissMarks, revealStage, settleFlights]);
 
   /* ---------------- keyboard ---------------- */
 
@@ -435,6 +485,8 @@ export const CrapsTable = ({ active = true }) => {
           onDragChip={startDrag}
         />
       </div>
+
+      {flights.length > 0 && <PayoutFlight flights={flights} onLand={landFlight} />}
 
       {drag && createPortal(
         <div

@@ -39,7 +39,9 @@ const LinkRow = ({ label, onClick }) => (
 );
 
 export const SettingsScreen = ({ onOpenRules, onOpenFairness }) => {
-  const { theme, sound, haptics, setTheme, setSound, setHaptics } = useSettingsStore();
+  const {
+    theme, sound, haptics, crapsTakeDownWins, setTheme, setSound, setHaptics, setCrapsTakeDownWins,
+  } = useSettingsStore();
   const balance = useWalletStore((s) => s.balance);
   const setBalance = useWalletStore((s) => s.setBalance);
 
@@ -74,6 +76,16 @@ export const SettingsScreen = ({ onOpenRules, onOpenFairness }) => {
         <Group title="Feedback">
           <Row label="Sound"><Switch label="Sound" checked={sound} onChange={changeSound} /></Row>
           <Row label="Haptics"><Switch label="Haptics" checked={haptics} onChange={changeHaptics} /></Row>
+        </Group>
+
+        <Group title="Craps">
+          <Row label="Take bets down after a win">
+            <Switch label="Take bets down after a win" checked={crapsTakeDownWins} onChange={setCrapsTakeDownWins} />
+          </Row>
+          <p className="px-3 pb-3 -mt-2 text-[14px] leading-5 text-ink-3">
+            When a place bet, hardway or Big 6 or 8 wins, the bet comes back to your balance with the winnings.
+            When off, only the winnings are paid and the bet stays up, as at a casino.
+          </p>
         </Group>
 
         <Group title="Wallet">

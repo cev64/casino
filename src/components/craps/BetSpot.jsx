@@ -7,11 +7,14 @@ import { formatMoney } from '../ui/RollingNumber';
 export const LONG_PRESS_MS = 500;
 const MOVE_TOLERANCE = 10;
 
-/** Chips leave the felt toward the dealer when lost, toward the player when collected. */
+/**
+ * Chips leave the felt toward the dealer when lost. When they are paid back they lift off as
+ * the payout chips leave for the balance pill (PayoutFlight carries them the rest of the way).
+ */
 const STACK_VARIANTS = {
   exit: (kind) => {
     if (kind === 'lose') return { y: -34, x: 0, opacity: 0, scale: 0.92, transition: { duration: 0.42, ease: [0.5, 0, 0.75, 0] } };
-    if (kind === 'win' || kind === 'push') return { y: 30, opacity: 0, scale: 0.96, transition: { duration: 0.4, ease: [0.5, 0, 0.75, 0], delay: 0.5 } };
+    if (kind === 'win' || kind === 'push') return { y: -6, opacity: 0, scale: 0.9, transition: { duration: 0.22, ease: [0.5, 0, 0.75, 0], delay: 0.4 } };
     return { opacity: 0, scale: 0.8, transition: { duration: 0.16 } };
   },
 };
@@ -165,7 +168,6 @@ export const BetSpot = memo(({
             animate={{ opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 380, damping: 26 } }}
             exit={{ opacity: 0, y: 22, transition: { duration: 0.34, ease: [0.5, 0, 0.75, 0] } }}
           >
-            <ChipStack amount={mark.profit} size="xs" showLabel={false} />
             <span className="cr-payout-label tnum">{formatMoney(mark.profit, { signed: true })}</span>
           </motion.div>
         )}
