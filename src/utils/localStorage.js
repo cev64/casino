@@ -6,7 +6,8 @@ const STORAGE_KEYS = {
   WALLET: 'casino_wallet',
   GAME_HISTORY: 'casino_game_history',
   SETTINGS: 'casino_settings',
-  FAIR_SESSIONS: 'casino_fair_sessions'
+  FAIR_SESSIONS: 'casino_fair_sessions',
+  CRAPS_TABLE: 'casino_craps_table'
 };
 
 const DEFAULT_BALANCE = 1000;
@@ -152,6 +153,29 @@ export const getAllFairSessions = () => {
   } catch (error) {
     console.error('Error getting fair sessions:', error);
     return {};
+  }
+};
+
+// Craps table: the bets on the felt (their money has already left the wallet), the point and
+// the recent rolls, so a reload neither loses nor refunds what is riding.
+export const getCrapsTable = () => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.CRAPS_TABLE);
+    return stored ? JSON.parse(stored) : null;
+  } catch (error) {
+    console.error('Error reading craps table:', error);
+    return null;
+  }
+};
+
+export const setCrapsTable = (table) => {
+  try {
+    if (table) localStorage.setItem(STORAGE_KEYS.CRAPS_TABLE, JSON.stringify(table));
+    else localStorage.removeItem(STORAGE_KEYS.CRAPS_TABLE);
+    return true;
+  } catch (error) {
+    console.error('Error saving craps table:', error);
+    return false;
   }
 };
 

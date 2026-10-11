@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { CrapsEngine, SPOT_IDS, parseSpot, spotAmount, totalOnTable, TABLE_LIMITS } from '../lib/craps';
 import { useWalletStore } from '../stores/walletStore';
 import { useGameStore } from '../stores/gameStore';
+import { getCrapsTable, setCrapsTable } from '../utils/localStorage';
 
 /**
  * Craps game hook. Wraps the engine, the wallet and the history store.
@@ -13,8 +14,10 @@ import { useGameStore } from '../stores/gameStore';
  *                         after the dice settle: roll() returns the result and
  *                         commitRoll(result) then pays the wallet, updates the displayed
  *                         state and writes the history record.
- *   leaving the page   -> a pending roll is committed; bets left on the table are refunded
- *                         (the engine does not survive a reload).
+ *   bets on the felt   -> saved after every change and put back on load, so a reload neither
+ *                         refunds a contract bet nor loses a working one. A pending roll is
+ *                         committed when the page goes away. Only if the table can't be saved
+ *                         are the bets refunded instead.
  */
 export const useCraps = () => {
   const [engine] = useState(() => new CrapsEngine());
@@ -31,14 +34,29 @@ export const useCraps = () => {
   const undoStack = useRef([]);
   const rebetPlan = useRef(null);
   const pending = useRef(null); // a rolled-but-not-yet-revealed result
+  const rolling = useRef(false); // the dice are being generated (before `pending` is set)
+  /** Bets can't change from the moment Roll is pressed until the result is revealed. */
+  const diceOut = () => rolling.current || !!pending.current;
 
-  const sync = useCallback(() => setGameState(engine.getGameState()), [engine]);
+  const ready = useRef(false);
+  /** Save the felt. Returns false when storage refuses. */
+  const persist = useCallback(() => {
+    if (!ready.current) return true;
+    return setCrapsTable(totalOnTable(engine.bets) > 0 || engine.phase === 'point' ? engine.snapshot() : null);
+  }, [engine]);
+
+  const sync = useCallback(() => {
+    persist();
+    setGameState(engine.getGameState());
+  }, [engine, persist]);
 
   useEffect(() => {
     let alive = true;
     (async () => {
       await engine.initialize();
       if (!alive) return;
+      engine.restore(getCrapsTable());
+      ready.current = true;
       setGameState(engine.getGameState());
       setIsInitialized(true);
     })();
@@ -66,11 +84,21 @@ export const useCraps = () => {
 
   /* ---------------- betting ---------------- */
 
-  const placeSpot = useCallback((spotId, amount) => {
+  /** Why `amount` can't go on `spotId` right now, or null. Pure check (drag previews use it). */
+  const checkSpot = useCallback((spotId, amount) => {
+    if (!ready.current) return 'The table is still opening';
+    if (diceOut()) return 'Wait for the dice';
     const { betType, number } = parseSpot(spotId);
     const error = engine.validateBet(betType, amount, number);
+    if (error) return error;
+    if (useWalletStore.getState().balance < amount) return 'Not enough balance';
+    return null;
+  }, [engine]);
+
+  const placeSpot = useCallback((spotId, amount) => {
+    const error = checkSpot(spotId, amount);
     if (error) return { success: false, error };
-    if (balance < amount) return { success: false, error: 'Not enough balance' };
+    const { betType, number } = parseSpot(spotId);
     const w = withdraw(amount);
     if (!w.success) return { success: false, error: 'Not enough balance' };
     engine.placeBet(betType, amount, number);
@@ -78,7 +106,7 @@ export const useCraps = () => {
     setUndoDepth(undoStack.current.length);
     sync();
     return { success: true };
-  }, [engine, balance, withdraw, sync]);
+  }, [engine, checkSpot, withdraw, sync]);
 
   /** Legacy signature: (betType, amount, number). */
   const placeBet = useCallback((betType, amount, number = null) => {
@@ -89,12 +117,13 @@ export const useCraps = () => {
   // Put taken-down bets back. Only valid until the next roll: afterwards the table has changed.
   const restore = useCallback((placements, nonce) => {
     const total = placements.reduce((s, p) => s + p.amount, 0);
-    if (total <= 0 || engine.nonce !== nonce || pending.current) return false;
+    if (total <= 0 || engine.nonce !== nonce || diceOut()) return false;
     if (useWalletStore.getState().balance < total) return false;
     if (!withdraw(total).success) return false;
     placements.forEach((p) => {
-      engine.placeBet(p.betType, p.amount, p.number, { force: true });
-      if (p.betType !== 'dontComeNumber') undoStack.current.push({ ...p });
+      engine.placeBet(p.betType, p.amount, p.number, { force: true, fresh: p.fresh || 0 });
+      // only chips placed since the last roll can be undone chip by chip
+      if (p.fresh > 0) undoStack.current.push({ betType: p.betType, number: p.number, amount: p.fresh, spot: p.spot });
     });
     setUndoDepth(undoStack.current.length);
     sync();
@@ -105,18 +134,25 @@ export const useCraps = () => {
 
   /** Take down a spot. Returns { success, refund, reason?, undo? }. */
   const removeSpot = useCallback((spotId) => {
+    if (diceOut()) return { success: false, refund: 0, reason: null };
     const r = engine.removeSpot(spotId);
     if (!r.refund) return { success: false, refund: 0, reason: r.reason || null, locked: !!r.locked };
     deposit(r.refund);
-    undoStack.current = undoStack.current.filter((e) => e.spot !== spotId);
+    const gone = new Set(r.placements.map((p) => p.spot));
+    undoStack.current = undoStack.current.filter((e) => !gone.has(e.spot));
     setUndoDepth(undoStack.current.length);
     sync();
     const nonce = engine.nonce;
-    return { success: true, refund: r.refund, undo: () => restore(r.placements, nonce) };
+    const comeNum = /^comeNum(\d+)$/.exec(spotId);
+    let message = null;
+    if (comeNum) message = `Odds on the come ${comeNum[1]} taken down, the come bet stays`;
+    else if (spotId === 'dontPass' && r.placements.length > 1) message = "Don't pass and its lay odds taken down";
+    return { success: true, refund: r.refund, message, undo: () => restore(r.placements, nonce) };
   }, [engine, deposit, sync, restore]);
 
   /** Undo the most recently placed chip. */
   const undoLast = useCallback(() => {
+    if (diceOut()) return { success: false };
     const entry = undoStack.current.pop();
     setUndoDepth(undoStack.current.length);
     if (!entry) return { success: false };
@@ -126,10 +162,14 @@ export const useCraps = () => {
     return { success: taken > 0, refund: taken };
   }, [engine, deposit, sync]);
 
-  /** Take down everything that may be taken down. Locked contract bets stay. */
+  /**
+   * Take back the chips placed since the last roll. Bets already working from earlier rolls
+   * (place bets, hardways, odds, contract bets) stay up; take those down one at a time.
+   */
   const clearBets = useCallback(() => {
+    if (diceOut()) return { success: false, refund: 0 };
     const nonce = engine.nonce;
-    const r = engine.clearRemovable();
+    const r = engine.clearNew();
     if (r.refund > 0) deposit(r.refund);
     undoStack.current = [];
     setUndoDepth(0);
@@ -139,6 +179,7 @@ export const useCraps = () => {
 
   /** Put the previous roll's bets back (only what is missing and legal right now). */
   const rebet = useCallback(() => {
+    if (diceOut() || !ready.current) return { success: false, error: 'Wait for the dice' };
     const plan = rebetPlan.current;
     if (!plan) return { success: false, error: 'No previous bets to repeat' };
     let placed = 0;
@@ -160,7 +201,7 @@ export const useCraps = () => {
     setUndoDepth(undoStack.current.length);
     sync();
     if (placed === 0) return { success: false, error: short ? 'Not enough balance' : (lastError || 'Your bets are already on the table') };
-    return { success: true, placed, skipped };
+    return { success: true, placed, skipped, short };
   }, [engine, withdraw, sync]);
 
   /* ---------------- rolling ---------------- */
@@ -172,7 +213,7 @@ export const useCraps = () => {
    * needs to animate. Call commitRoll(result) once the result is revealed.
    */
   const roll = useCallback(async () => {
-    if (pending.current) return null;
+    if (diceOut()) return null;
     const blocked = engine.validateRoll();
     if (blocked) return { error: blocked };
 
@@ -184,7 +225,13 @@ export const useCraps = () => {
     }
 
     rebetPlan.current = engine.spotAmounts();
-    const result = await engine.roll(forced);
+    rolling.current = true;
+    let result;
+    try {
+      result = await engine.roll(forced);
+    } finally {
+      rolling.current = false;
+    }
     pending.current = result;
     undoStack.current = [];
     setUndoDepth(0);
@@ -201,7 +248,7 @@ export const useCraps = () => {
     sync();
   }, [deposit, recordRoll, sync]);
 
-  // The engine doesn't survive leaving the page: settle a pending roll, refund bets left up.
+  // Leaving the page: settle a pending roll and save the felt (it is put back on load).
   useEffect(() => {
     const onHide = (e) => {
       if (e.persisted) return; // bfcache: the page (and engine) comes back intact
@@ -211,17 +258,31 @@ export const useCraps = () => {
         if (r.payout > 0) useWalletStore.getState().deposit(r.payout);
         recordRoll(r);
       }
-      const left = totalOnTable(engine.bets);
-      if (left > 0) {
-        useWalletStore.getState().deposit(left);
+      if (!ready.current) return;
+      if (!persist()) {
+        // storage refused: hand the chips back rather than lose them
+        const left = totalOnTable(engine.bets);
+        if (left > 0) useWalletStore.getState().deposit(left);
         engine.resetBets();
       }
     };
     window.addEventListener('pagehide', onHide);
     return () => window.removeEventListener('pagehide', onHide);
-  }, [engine, recordRoll]);
+  }, [engine, recordRoll, persist]);
 
   const totalBets = useMemo(() => totalOnTable(gameState?.bets), [gameState]);
+  // Rebet is offered only when it would actually put something on the table.
+  const rebetReady = useMemo(() => {
+    const plan = rebetPlan.current;
+    if (!canRebet || !plan || !gameState) return false;
+    return Object.entries(plan).some(([spotId, wanted]) => {
+      const missing = wanted - spotAmount(gameState.bets, spotId);
+      if (missing <= 0 || missing > balance) return false;
+      const { betType, number } = parseSpot(spotId);
+      return !engine.validateBet(betType, missing, number);
+    });
+  }, [canRebet, gameState, balance, engine]);
+  const newBets = useMemo(() => Object.values(gameState?.fresh || {}).reduce((s, v) => s + v, 0), [gameState]);
 
   return {
     gameState,
@@ -229,10 +290,12 @@ export const useCraps = () => {
     rollResult,
     balance,
     totalBets,
+    newBets,
     limits: TABLE_LIMITS,
     spots: SPOT_IDS,
     undoDepth,
-    canRebet,
+    canRebet: rebetReady,
+    checkSpot,
     placeSpot,
     placeBet,
     removeSpot,

@@ -22,13 +22,21 @@ export const CrapsBoard = memo(({
   onRemove,
   stage,
   travel,
+  dropTarget, // { spot, ok } while a chip is dragged over a spot
 }) => {
   const bets = state.bets;
   const { phase, point } = state;
   const isPoint = phase === 'point';
 
+  const fresh = state.fresh || {};
   const common = { busy, onPlace, onRemove };
-  const mark = (id) => marks[id];
+  // per-spot props shared by every BetSpot: result mark, new chips, drop highlight
+  const at = (id) => ({
+    id,
+    mark: marks[id],
+    isNew: fresh[id] > 0,
+    drop: dropTarget?.spot === id ? (dropTarget.ok ? 'ok' : 'bad') : null,
+  });
 
   const passFlat = bets.passLine;
   const dpFlat = bets.dontPass;
@@ -58,12 +66,11 @@ export const CrapsBoard = memo(({
             <div key={n} className={`cr-num ga-n${n}`} data-point={isThePoint || undefined} data-n={n}>
               {dcTotal > 0 ? (
                 <BetSpot
-                  id={`dontComeNum${n}`}
                   label={spotLabel(`dontComeNum${n}`)}
                   amount={dcTotal}
                   className="cr-lay"
                   stackSize="xs"
-                  mark={mark(`dontComeNum${n}`)}
+                  {...at(`dontComeNum${n}`)}
                   extraLabel="tap to add lay odds"
                   {...common}
                 >
@@ -74,12 +81,11 @@ export const CrapsBoard = memo(({
               )}
 
               <BetSpot
-                id={`place${n}`}
                 label={spotLabel(`place${n}`)}
                 amount={bets.place[n]}
                 className="cr-placebox"
                 off={!isPoint}
-                mark={mark(`place${n}`)}
+                {...at(`place${n}`)}
                 stackSize="xs"
                 {...common}
               >
@@ -88,14 +94,13 @@ export const CrapsBoard = memo(({
 
               {comeTotal > 0 && (
                 <BetSpot
-                  id={`comeNum${n}`}
                   label={spotLabel(`comeNum${n}`)}
                   amount={comeTotal}
                   className="cr-comebox"
-                  locked={come.odds <= 0}
+                  locked // the flat bet rides until it wins or loses; only its odds come down
                   off={!isPoint && come.odds > 0}
-                  mark={mark(`comeNum${n}`)}
-                  extraLabel={come.odds > 0 ? `including ${formatMoney(come.odds)} odds` : 'tap to add odds'}
+                  {...at(`comeNum${n}`)}
+                  extraLabel={come.odds > 0 ? `including ${formatMoney(come.odds)} odds${!isPoint ? ', odds off on the come-out' : ''}` : 'tap to add odds'}
                   hint={come.odds > 0 ? 'Odds' : null}
                   stackSize="xs"
                   layoutId={travel?.to === n ? 'cr-travel-come' : undefined}
@@ -110,12 +115,11 @@ export const CrapsBoard = memo(({
 
         {/* ---------------- Don't come bar ---------------- */}
         <BetSpot
-          id="dontCome"
           label={spotLabel('dontCome')}
           amount={bets.dontCome}
           className="ga-dcb cr-box cr-dcb"
           blockedReason={!isPoint ? 'Come bets follow a point' : null}
-          mark={mark('dontCome')}
+          {...at('dontCome')}
           stackSize="xs"
           {...common}
         >
@@ -128,11 +132,10 @@ export const CrapsBoard = memo(({
         {[6, 8].map((n) => (
           <BetSpot
             key={n}
-            id={`big${n}`}
             label={spotLabel(`big${n}`)}
             amount={bets[`big${n}`]}
             className={`ga-big${n} cr-box cr-big`}
-            mark={mark(`big${n}`)}
+            {...at(`big${n}`)}
             stackSize="xs"
             {...common}
           >
@@ -142,12 +145,11 @@ export const CrapsBoard = memo(({
 
         {/* ---------------- Come ---------------- */}
         <BetSpot
-          id="come"
           label={spotLabel('come')}
           amount={bets.come}
           className="ga-come cr-box cr-come"
           blockedReason={!isPoint ? 'Come bets follow a point' : null}
-          mark={mark('come')}
+          {...at('come')}
           layoutId={travel ? 'cr-travel-come' : undefined}
           stackSize="sm"
           {...common}
@@ -159,11 +161,10 @@ export const CrapsBoard = memo(({
 
         {/* ---------------- Field ---------------- */}
         <BetSpot
-          id="field"
           label={spotLabel('field')}
           amount={bets.field}
           className="ga-field cr-box cr-field"
-          mark={mark('field')}
+          {...at('field')}
           stackSize="sm"
           extraLabel="two and twelve pay double"
           {...common}
@@ -183,12 +184,11 @@ export const CrapsBoard = memo(({
 
         {/* ---------------- Don't pass / Pass line ---------------- */}
         <BetSpot
-          id="dontPass"
           label={spotLabel('dontPass')}
           amount={dpFlat}
           className="ga-dp cr-box cr-dp"
           blockedReason={isPoint ? 'Line bets are placed on the come-out roll' : null}
-          mark={mark('dontPass')}
+          {...at('dontPass')}
           stackSize="xs"
           {...common}
         >
@@ -206,11 +206,10 @@ export const CrapsBoard = memo(({
               exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.16 } }}
             >
               <BetSpot
-                id="dontPassOdds"
                 label={spotLabel('dontPassOdds')}
                 amount={bets.dontPassOdds}
                 className="cr-box cr-odds"
-                mark={mark('dontPassOdds')}
+                {...at('dontPassOdds')}
                 extraLabel={`up to ${formatMoney(layMax)}`}
                 stackSize="xs"
                 {...common}
@@ -222,13 +221,12 @@ export const CrapsBoard = memo(({
         </AnimatePresence>
 
         <BetSpot
-          id="passLine"
           label={spotLabel('passLine')}
           amount={passFlat}
           className="ga-pass cr-box cr-pass"
           blockedReason={isPoint ? 'Line bets are placed on the come-out roll' : null}
           locked={isPoint}
-          mark={mark('passLine')}
+          {...at('passLine')}
           stackSize="sm"
           {...common}
         >
@@ -245,11 +243,10 @@ export const CrapsBoard = memo(({
               exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.16 } }}
             >
               <BetSpot
-                id="odds"
                 label={spotLabel('odds')}
                 amount={bets.odds}
                 className="cr-box cr-odds"
-                mark={mark('odds')}
+                {...at('odds')}
                 extraLabel={`up to ${formatMoney(oddsMax)}`}
                 stackSize="xs"
                 {...common}
@@ -264,11 +261,10 @@ export const CrapsBoard = memo(({
         {/* ---------------- Proposition bets ---------------- */}
         <div className="cr-props" role="group" aria-label="Proposition bets">
           <BetSpot
-            id="anySeven"
             label={spotLabel('anySeven')}
             amount={bets.anySeven}
             className="pr-seven cr-box cr-prop cr-seven"
-            mark={mark('anySeven')}
+            {...at('anySeven')}
             stackSize="xs"
             extraLabel="one roll, pays 4 to 1"
             {...common}
@@ -280,12 +276,11 @@ export const CrapsBoard = memo(({
           {HARD_NUMBERS.map((n) => (
             <BetSpot
               key={n}
-              id={`hard${n}`}
               label={spotLabel(`hard${n}`)}
               amount={bets.hardways[n]}
               className={`pr-h${n} cr-box cr-prop cr-hard`}
               off={!isPoint}
-              mark={mark(`hard${n}`)}
+              {...at(`hard${n}`)}
               stackSize="xs"
               extraLabel={`pays ${HARD_PAY[n]} to 1`}
               {...common}
@@ -299,11 +294,10 @@ export const CrapsBoard = memo(({
           {HORN_NUMBERS.map((n) => (
             <BetSpot
               key={n}
-              id={`horn${n}`}
               label={`${spotLabel(`horn${n}`)}`}
               amount={bets.horn[n]}
               className={`pr-o${n} cr-box cr-prop cr-horn`}
-              mark={mark(`horn${n}`)}
+              {...at(`horn${n}`)}
               stackSize="xs"
               extraLabel={`one roll, pays ${HORN_PAY[n]} to 1`}
               {...common}
@@ -315,11 +309,10 @@ export const CrapsBoard = memo(({
           ))}
 
           <BetSpot
-            id="anyCraps"
             label={spotLabel('anyCraps')}
             amount={bets.anyCraps}
             className="pr-craps cr-box cr-prop cr-anycraps"
-            mark={mark('anyCraps')}
+            {...at('anyCraps')}
             stackSize="xs"
             extraLabel="one roll, pays 7 to 1"
             {...common}

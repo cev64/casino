@@ -5,7 +5,7 @@ Blackjack and craps in the browser, with play money and provably fair randomness
 ## Features
 
 - **Blackjack.** Six-deck shoe, dealer stands on soft 17, blackjack pays 3 to 2. Dealer peeks for blackjack. Hit, stand, double (also after a split), split up to four hands, insurance, even money and late surrender.
-- **Craps.** Pass and don't pass, come and don't come with odds and lay odds (3-4-5x), place, Big 6 and 8, field, hardways and one-roll bets, with a dealer puck and a shooter's point. Tap to bet; press and hold or right-click to take a bet down.
+- **Craps.** Pass and don't pass, come and don't come with odds and lay odds (3-4-5x), place, Big 6 and 8, field, hardways and one-roll bets, with a dealer puck and a shooter's point. Tap a spot or drag a chip from the rack onto it; press and hold or right-click to take a bet down. Clear takes back only the chips placed since the last roll. Bets on the felt survive a reload.
 - **Provably fair.** Every shuffle and roll is derived from `SHA-256(serverSeed:clientSeed:nonce)`. The Provably fair sheet in Settings recomputes a roll or the opening cards of a shoe from seeds you paste in.
 - **History.** Results grouped by day with net result, win rate and a running chart. Clearing history can be undone.
 - **Settings.** System, light or dark theme, sound, haptics, and a balance reset that can be undone.
@@ -22,7 +22,7 @@ Blackjack and craps in the browser, with play money and provably fair randomness
 
 Blackjack: `Enter` deal or deal again, `H` hit, `S` stand, `D` double, `P` split, `U` surrender, `Y` / `N` insurance, `R` rebet, `C` clear, `Backspace` remove the last chip.
 
-Craps: `Space` or `R` roll, `U` or `Backspace` undo the last bet, `C` clear, `B` rebet, `Delete` on a focused spot takes that bet down.
+Craps: `Space` or `R` roll, `U` or `Backspace` undo the last chip, `C` clear the chips placed since the last roll, `B` rebet, `Delete` on a focused spot takes that bet down.
 
 ## Design
 
@@ -61,4 +61,4 @@ src/
   styles/                 tokens and per-area stylesheets
 ```
 
-Balance, history and settings are stored in the browser's `localStorage`.
+Balance, history, settings and the bets on the craps felt are stored in the browser's `localStorage`.

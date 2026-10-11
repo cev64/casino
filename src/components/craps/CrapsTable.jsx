@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useCraps } from '../../hooks/useCraps';
 import { haptic } from '../../stores/settingsStore';
 import { Felt } from '../ui/Felt';
@@ -6,10 +7,12 @@ import { WinCelebration } from '../ui/WinCelebration';
 import { RollingNumber, formatMoney } from '../ui/RollingNumber';
 import { toast } from '../ui/Toast';
 import { sounds } from '../../utils/sounds';
-import { summarizeRoll, spotLabel } from '../../lib/craps';
+import { summarizeRoll, spotLabel, spotAmount, isFlatMinSpot, TABLE_LIMITS } from '../../lib/craps';
+import { Chip } from '../ui/Chip';
 import { CrapsBoard } from './CrapsBoard';
 import { ControlDock, RACK_VALUES } from './ControlDock';
 import { RollHistory } from './RollHistory';
+import { useChipDrag } from './useChipDrag';
 
 /* ------------------------------------------------------------------------------------------------
  * Timing. The engine resolves a roll instantly; the table plays it back at a human pace so that
@@ -20,7 +23,7 @@ const TOSS_MS = 1000; // across the felt toward the back wall
 const LAND_SOUND_MS = 380; // first bounce after the toss
 const LAND_TIMEOUT_MS = 1600; // fallback if the dice never report landing (they normally do in ~1s)
 const HOLD_MS = 900; // dice sit still so the roll registers before it is announced and settled
-const RESOLVE_MS = 1700; // payout chips / sweep stay visible
+const RESOLVE_MS = 1700; // payout chips / sweep stay visible (the table is already open for bets)
 const REDUCED = {
   SHAKE_MS: 80, TOSS_MS: 160, LAND_SOUND_MS: 0, LAND_TIMEOUT_MS: 0, HOLD_MS: 800, RESOLVE_MS: 1200,
 };
@@ -59,8 +62,9 @@ const buildMarks = (result) => {
     const id = outcomeSpot(o.bet);
     const cur = marks[id] || { result: null, profit: 0 };
     cur.profit += Math.max(0, o.net);
-    // one spot can carry a flat bet and its odds: winning beats pushing beats losing
-    const rank = { win: 3, push: 2, lose: 1 };
+    // One spot can carry a flat bet and its odds. A win shows as a win; otherwise a lost flat
+    // bet must be seen going to the dealer even when its odds come back (odds off on the come-out).
+    const rank = { win: 3, lose: 2, push: 1 };
     if (!cur.result || rank[o.result] > rank[cur.result]) cur.result = o.result;
     marks[id] = cur;
   });
@@ -73,8 +77,8 @@ const writeHint = () => { try { localStorage.setItem(firstSeenKey, '1'); } catch
 
 export const CrapsTable = ({ active = true }) => {
   const {
-    gameState, rollResult, balance, totalBets, undoDepth, canRebet,
-    placeSpot, removeSpot, undoLast, clearBets, rebet, rollBlockedReason, roll, commitRoll,
+    gameState, balance, totalBets, newBets, undoDepth, canRebet,
+    checkSpot, placeSpot, removeSpot, undoLast, clearBets, rebet, rollBlockedReason, roll, commitRoll,
   } = useCraps();
 
   const [chip, setChip] = useState(25);
@@ -103,6 +107,8 @@ export const CrapsTable = ({ active = true }) => {
     if (fit) setChip(fit);
   }, [balance, chip]);
 
+  const gameStateRef = useRef(gameState);
+  gameStateRef.current = gameState;
   const rolls = gameState?.rollHistory || [];
   const phase = gameState?.phase || 'comeOut';
   const point = gameState?.point || null;
@@ -115,19 +121,34 @@ export const CrapsTable = ({ active = true }) => {
     setTravel(null);
   }, []);
 
-  const handlePlace = useCallback((spotId) => {
+  const handlePlace = useCallback((spotId, amount = chip) => {
     if (busyRef.current) return;
     dismissMarks();
-    const r = placeSpot(spotId, chip);
+    const r = placeSpot(spotId, amount);
     if (r.success) {
       sounds.chipPlace?.();
       haptic(8);
       if (!hintSeen) { writeHint(); setHintSeen(true); }
+      // say so now rather than when Roll refuses
+      const now = spotAmount(gameStateRef.current?.bets, spotId) + amount;
+      if (isFlatMinSpot(spotId) && now < TABLE_LIMITS.min) {
+        notify(`${spotLabel(spotId)} needs at least ${formatMoney(TABLE_LIMITS.min)} to roll`, { tone: 'warn' });
+      }
     } else {
       sounds.error?.();
       notify(r.error, { tone: 'bad' });
     }
   }, [placeSpot, chip, hintSeen, dismissMarks]);
+
+  /* ---------------- drag and drop ---------------- */
+
+  const { drag, ghostRef, startDrag } = useChipDrag({
+    enabled: () => !busyRef.current,
+    check: (spotId, value) => checkSpot(spotId, value),
+    onPick: (value) => { setChip(value); haptic(6); },
+    onDrop: (spotId, value) => handlePlace(spotId, value),
+  });
+  const dropTarget = useMemo(() => (drag?.spot ? { spot: drag.spot, ok: !drag.error } : null), [drag]);
 
   const handleRemove = useCallback((spotId) => {
     if (busyRef.current) return;
@@ -135,10 +156,11 @@ export const CrapsTable = ({ active = true }) => {
     if (r.success) {
       sounds.chipRemove?.();
       haptic(12);
-      toast(`${spotLabel(spotId)} bet removed`, {
+      toast(`${r.message || `${spotLabel(spotId)} taken down`}, ${formatMoney(r.refund)} back`, {
         action: {
           label: 'Undo',
           onClick: () => {
+            if (busyRef.current) { toast('Wait for the dice', { tone: 'warn' }); return; }
             if (r.undo()) { sounds.chipPlace?.(); haptic(8); } else toast('Could not restore that bet', { tone: 'warn' });
           },
         },
@@ -159,15 +181,20 @@ export const CrapsTable = ({ active = true }) => {
     if (busyRef.current) return;
     const r = clearBets();
     if (!r.success) {
-      toast(totalBets > 0 ? 'Remaining bets are locked until they resolve' : 'No bets to clear');
+      notify(totalBets > 0
+        ? 'No new bets to clear. Bets from earlier rolls stay up: right-click or press and hold one to take it down.'
+        : 'No bets to clear');
       return;
     }
     sounds.chipRemove?.();
     haptic(12);
-    toast('Bets cleared', {
+    toast(`New bets cleared, ${formatMoney(r.refund)} back`, {
       action: {
         label: 'Undo',
-        onClick: () => { if (r.undo()) sounds.chipStack?.(); else toast('Could not restore those bets', { tone: 'warn' }); },
+        onClick: () => {
+          if (busyRef.current) { toast('Wait for the dice', { tone: 'warn' }); return; }
+          if (r.undo()) sounds.chipStack?.(); else toast('Could not restore those bets', { tone: 'warn' });
+        },
       },
     });
   }, [clearBets, totalBets]);
@@ -179,7 +206,8 @@ export const CrapsTable = ({ active = true }) => {
     if (r.success) {
       sounds.chipStack?.();
       haptic(10);
-      if (r.skipped) toast(`${r.placed} placed, ${r.skipped} not available now`, { tone: 'warn' });
+      // bets the table doesn't take right now (line bets during a point, say) are skipped quietly
+      if (r.short) toast('Not enough balance to repeat every bet', { tone: 'warn' });
     } else {
       notify(r.error, { tone: 'bad' });
     }
@@ -280,12 +308,16 @@ export const CrapsTable = ({ active = true }) => {
       sounds.chipStack?.();
     }
 
-    await sleep(t.RESOLVE_MS);
-    if (!alive.current) return;
-    setMarks({});
-    setTravel(null);
+    // The table opens for the next bets right away; the payout marks fade on their own
+    // (or as soon as a new chip goes down).
     busyRef.current = false;
     setBusy(false);
+    clearTimeout(clearMarksTimer.current);
+    clearMarksTimer.current = setTimeout(() => {
+      if (!alive.current) return;
+      setMarks({});
+      setTravel(null);
+    }, t.RESOLVE_MS);
   }, [roll, rollBlockedReason, commitRoll, dismissMarks, revealStage]);
 
   /* ---------------- keyboard ---------------- */
@@ -378,12 +410,13 @@ export const CrapsTable = ({ active = true }) => {
             onRemove={handleRemove}
             stage={stage}
             travel={travel}
+            dropTarget={dropTarget}
           />
         )}
       </Felt>
 
       <p id="cr-spot-help" className="sr-only">
-        Press Enter to place the selected chip. Press Delete, right-click, or press and hold to take the bet down.
+        Press Enter to place the selected chip, or drag a chip from the rack onto the spot. Press Delete, right-click, or press and hold to take the bet down.
       </p>
 
       <div className="cr-dock-wrap" ref={dockRef}>
@@ -393,14 +426,30 @@ export const CrapsTable = ({ active = true }) => {
           balance={balance}
           busy={busy}
           canUndo={undoDepth > 0}
-          canClear={totalBets > 0}
+          canClear={newBets > 0}
           canRebet={canRebet}
           onUndo={handleUndo}
           onClear={handleClear}
           onRebet={handleRebet}
           onRoll={handleRoll}
+          onDragChip={startDrag}
         />
       </div>
+
+      {drag && createPortal(
+        <div
+          ref={ghostRef}
+          className="cr-ghost"
+          data-target={drag.spot ? (drag.error ? 'bad' : 'ok') : undefined}
+          aria-hidden="true"
+        >
+          <Chip value={drag.value} size="lg" />
+          {drag.spot && (
+            <span className="cr-ghost-tip">{drag.error || spotLabel(drag.spot)}</span>
+          )}
+        </div>,
+        document.body,
+      )}
 
     </div>
   );
